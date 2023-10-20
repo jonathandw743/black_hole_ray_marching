@@ -95,6 +95,15 @@ fn rd_derivative(ro: vec3<f32>, h2: f32) -> vec3<f32> {
     return DISTORTION_POWER * -1.5 * h2 * ro / pow(dot(ro, ro), 2.5);
 }
 
+@group(2) @binding(0)
+var t_diffuse: texture_2d<f32>;
+@group(2)@binding(1)
+var s_diffuse: sampler;
+
+fn tsw(t_diffuse: texture_2d<f32>, s_difuse: sampler, tex_coords: vec2<f32>) -> vec4<f32> {
+    return textureSample(t_diffuse, s_diffuse, tex_coords);
+}
+
 fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
     // let BLACK_HOLE: BlackHole = BlackHole(vec3<f32>(0.0, 0.0, 0.0), BLACK_HOLE_MASS);
     
@@ -152,7 +161,12 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
             break;
         }        
     }
-    return rd * BG_BRIGHTNESS;
+    // let 
+    let x = (atan2(rd.z, rd.x) + TWO_PI * 0.5) / TWO_PI;
+    let y = (-rd.y + 1.0) * 0.5;
+    let col = tsw(t_diffuse, s_diffuse, vec2<f32>(x, y)).xyz;
+    return col;
+    // return rd * BG_BRIGHTNESS;
 }
 
 // fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {

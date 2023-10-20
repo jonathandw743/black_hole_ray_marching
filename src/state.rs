@@ -162,7 +162,7 @@ impl State {
             dir: (0.0, 0.0, 1.0).into(),
             up: cgmath::Vector3::unit_y(),
             aspect: config.width as f32 / config.height as f32,
-            fovy: 90.0,
+            fovy: 70.0,
             znear: 0.1,
             zfar: 100.0,
         };
@@ -296,33 +296,46 @@ impl State {
             uniform_controller_group.bind_group(&device, Some("uniforms"));
 
         surface.configure(&device, &config);
+        surface.configure(&device, &config);
+        let diffuse_bytes = include_bytes!("space.jpg");
+        let diffuse_texture = Texture::from_bytes(&device, &queue, diffuse_bytes, "space.png").unwrap();
+
         let diffuse_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
-                // wgpu::BindGroupLayoutEntry {
-                //     binding: 0,
-                //     visibility: wgpu::ShaderStages::FRAGMENT,
-                //     ty: wgpu::BindingType::Texture {
-                //         multisampled: false,
-                //         view_dimension: wgpu::TextureViewDimension::D2,
-                //         sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                //     },
-                //     count: None,
-                // },
-                // wgpu::BindGroupLayoutEntry {
-                //     binding: 1,
-                //     visibility: wgpu::ShaderStages::FRAGMENT,
-                //     // This should match the filterable field of the
-                //     // corresponding Texture entry above.
-                //     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                //     count: None,
-                // },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    // This should match the filterable field of the
+                    // corresponding Texture entry above.
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
             ],
-            label: Some("diffuse_bind_group_layout"),
+            label: Some("texture_bind_group_layout"),
         });
 
         let diffuse_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &diffuse_bind_group_layout,
-            entries: &[],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&diffuse_texture.view), // CHANGED!
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler), // CHANGED!
+                },
+            ],
             label: Some("diffuse_bind_group"),
         });
 
@@ -463,7 +476,7 @@ impl State {
         .iter()
         .any(|&result| result)
     }
-    
+
     pub fn update(&mut self) {
         self.delta_time = self.start_of_last_frame_instant.elapsed();
         // println!("{:?}", self.delta_time);
