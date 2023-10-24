@@ -1,5 +1,5 @@
 [package]
-name = "bh"
+name = "black_hole_ray_marching"
 version = "0.1.0"
 edition = "2021"
 

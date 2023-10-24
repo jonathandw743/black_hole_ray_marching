@@ -2,7 +2,7 @@
 // #[allow(dead_code)]
 // #[allow(unused)]
 
-use bh::run;
+use black_hole_ray_marching::run;
 
 
 
