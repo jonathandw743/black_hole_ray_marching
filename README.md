@@ -1,1 +1,10 @@
-there is discrepancy between the speed of the desktop version and the wasm version - check the deltatime time control, framerates etc
+# Black Hole Ray Marching
+
+Using rust and WGPU (wgpu-rs), and wgsl shaders.
+
+Use `cargo run` to start.
+
+WASM support may be added.
+
+![Black hole](images/blackhole.png)
+![Black hole from underneath](images/blackholefromunderneath.png)
