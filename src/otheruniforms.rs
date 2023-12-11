@@ -1,3 +1,5 @@
+use std::num::NonZeroU64;
+
 use encase::{ShaderType, ShaderSize, internal::{WriteInto, Writer, SizeValue}};
 use crate::uniformscontroller::{Increment, Opposite};
 use winit::event::{WindowEvent, VirtualKeyCode, ElementState, KeyboardInput};
@@ -51,6 +53,7 @@ pub trait IncValueTrait {
     fn decrement(&mut self);
     // could change this into a more generic UniformBuffer thing like encase does
     fn write_into_buffer(&self, buffer: &mut Vec<u8>, offset: usize);
+    fn size(&self) -> NonZeroU64;
 }
 
 impl<T, I> IncValueTrait for IncValue<T, I>
@@ -68,6 +71,9 @@ where
     fn write_into_buffer(&self, buffer: &mut Vec<u8>, offset: usize) {
         let mut writer = Writer::new(&self.value, buffer, offset).unwrap();
         self.value.write_into(&mut writer);
+    }
+    fn size(&self) -> NonZeroU64 {
+        self.value.size()
     }
 }
 
