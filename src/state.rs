@@ -37,6 +37,7 @@ use crate::vertices::VERTICES;
 use crate::indices::INDICES;
 
 use crate::uniformscontroller::*;
+use crate::otheruniforms::*;
 
 use crate::podbool::*;
 
@@ -227,15 +228,11 @@ impl State {
             ],
         );
 
-        dbg!(other_uniforms.uniform_buffer_content());
-        dbg!(other_uniforms.uniform_buffer_content().len());
         let data = other_uniforms.uniform_buffer_content();
         let mut d: [u8; 1284] = unsafe {std::mem::zeroed()};
         for (i, x) in data.iter().enumerate() {
             d[i] = *x;
         }
-        dbg!(std::mem::size_of_val(&d));
-        dbg!(std::mem::size_of_val(&other_uniforms.uniform_buffer_content()));
 
         let other_uniforms_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("camer uniforms"),
@@ -285,73 +282,6 @@ impl State {
             ],
             label: Some("camera uniforms"),
         });
-
-        // uniforms
-
-        // let uniform_controller_group = UniformControllerGroup::new(
-        //     [
-        //         Box::new(UniformController {
-        //             uniform: UniformAndBuffer::new(
-        //                 "schwarzschild radius".into(),
-        //                 1.0,
-        //                 &device,
-        //                 wgpu::ShaderStages::FRAGMENT,
-        //             ),
-        //             increment: 0.1,
-        //             positive_modifier_key_code: VirtualKeyCode::PageUp,
-        //             negative_modifier_key_code: VirtualKeyCode::PageDown,
-        //         }),
-        //         Box::new(UniformController {
-        //             uniform: UniformAndBuffer::new("max delta time".into(), 0.3, &device, wgpu::ShaderStages::FRAGMENT),
-        //             increment: 0.02,
-        //             positive_modifier_key_code: VirtualKeyCode::PageUp,
-        //             negative_modifier_key_code: VirtualKeyCode::PageDown,
-        //         }),
-        //         Box::new(UniformController {
-        //             uniform: UniformAndBuffer::new(
-        //                 "background brightness".into(),
-        //                 0.5,
-        //                 &device,
-        //                 wgpu::ShaderStages::FRAGMENT,
-        //             ),
-        //             increment: 0.1,
-        //             positive_modifier_key_code: VirtualKeyCode::PageUp,
-        //             negative_modifier_key_code: VirtualKeyCode::PageDown,
-        //         }),
-        //         Box::new(UniformController {
-        //             uniform: UniformAndBuffer::new(
-        //                 "blackout event horizon".into(),
-        //                 PodBool::r#false(),
-        //                 &device,
-        //                 wgpu::ShaderStages::FRAGMENT,
-        //             ),
-        //             increment: PodBool::r#true(),
-        //             positive_modifier_key_code: VirtualKeyCode::PageUp,
-        //             negative_modifier_key_code: VirtualKeyCode::PageDown,
-        //         }),
-        //         Box::new(UniformController {
-        //             uniform: UniformAndBuffer::new("max view dist".into(), 30.0, &device, wgpu::ShaderStages::FRAGMENT),
-        //             increment: 1.0,
-        //             positive_modifier_key_code: VirtualKeyCode::PageUp,
-        //             negative_modifier_key_code: VirtualKeyCode::PageDown,
-        //         }),
-        //         Box::new(UniformController {
-        //             uniform: UniformAndBuffer::new(
-        //                 "distortion power".into(),
-        //                 1.0,
-        //                 &device,
-        //                 wgpu::ShaderStages::FRAGMENT,
-        //             ),
-        //             increment: 1.0,
-        //             positive_modifier_key_code: VirtualKeyCode::PageUp,
-        //             negative_modifier_key_code: VirtualKeyCode::PageDown,
-        //         }),
-        //     ],
-        //     true,
-        // );
-
-        // let (uniform_bind_group_layout, uniform_bind_group) =
-        //     uniform_controller_group.bind_group(&device, Some("uniforms"));
 
         // diffuse texture stuff
 
@@ -404,9 +334,6 @@ impl State {
         let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
             bind_group_layouts: &[
-                //// &resolution_bind_group_layout,
-                //// &anti_ailiasing_bind_group_layout,
-                // &camera_bind_group_layout,
                 &uniform_bind_group_layout,
                 &diffuse_bind_group_layout,
             ],
@@ -493,10 +420,6 @@ impl State {
             settings_controller,
             camera,
             camera_controller,
-            // camera_view_proj_uniform,
-            // camera_view_proj_buffer,
-            // camera_pos_uniform,
-            // camera_pos_buffer,
             camera_uniform,
             camera_uniform_buffer,
 
@@ -513,7 +436,6 @@ impl State {
             start_of_last_frame_instant: last_frame_time,
             delta_time,
             should_render,
-            // buffer5,
         }
     }
 
@@ -555,31 +477,20 @@ impl State {
     pub fn update(&mut self) {
         flame::start("update");
         self.delta_time = self.start_of_last_frame_instant.elapsed();
-        // println!("{:?}", self.delta_time);
         self.start_of_last_frame_instant += self.delta_time;
         // update controllers
         self.settings_controller.update_settings(&mut self.settings);
         self.should_render = self.camera_controller.update_camera(&mut self.camera, self.delta_time);
         self.should_render = true;
         // camera update camera uniform and buffer
-        // self.camera_view_proj_uniform.update(&self.camera);
-        flame::start("update camera");
         self.camera_uniform.update(&self.camera);
-        flame::end("update camera");
 
-        // let mut buffer5 = encase::UniformBuffer::new(Vec::new());
-        // buffer5.write(&self.camera_view_proj_uniform).unwrap();
-        // let byte_buffer5 = buffer5.into_inner();
-        // // self.queue.write_buffer_with(&self.camera_view_proj_buffer, 0, )
-        // self.queue.write_buffer(&self.camera_view_proj_buffer, 0, &byte_buffer5);
-        // self.camera_pos_uniform.update(&self.camera);
         flame::start("getting data");
         let data = self.camera_uniform.uniform_buffer_content();
         let mut d: [u8; 80] = unsafe {std::mem::zeroed()};
         for (i, x) in data.iter().enumerate() {
             d[i] = *x;
         }
-        // let stuff_to_send: &[u8] = bytemuck::cast_slice(&[0u8; 80]);
         let stuff_to_send: &[u8] = bytemuck::cast_slice(&d);
         flame::end("getting data");
         dbg!(data.len());
@@ -599,27 +510,16 @@ impl State {
             return Ok(());
         }
 
-        flame::start("render setup");
         // the output texture for the render
-        flame::start("gct");
-        // this takes way too long (like it does initially on startup)
         let output = self.surface.get_current_texture()?;
-        dbg!(std::mem::size_of_val(&output));
-        flame::end("gct");
         // a way to access this output texture
-        flame::start("cv");
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
-        flame::end("cv");
 
-        flame::start("encoder");
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
-        flame::end("encoder");
-        flame::end("render setup");
 
         {
-            flame::start("rp");
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -639,35 +539,23 @@ impl State {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
-            flame::end("rp");
 
-            flame::start("vertex and index buffers");
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            flame::end("vertex and index buffers");
-            flame::start("sbg 0");
 
             
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
             // render_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
-            flame::end("sbg 0");
-            flame::start("sbg 1");
 
             render_pass.set_bind_group(1, &self.diffuse_bind_group, &[]);
-            flame::end("sbg 1");
             
-            flame::start("draw call");
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
-            flame::end("draw call");
         }
 
-        flame::start("output");
         self.queue.submit(iter::once(encoder.finish()));
         output.present();
-        flame::end("output");
 
 
-        flame::end("render");
         Ok(())
     }
 

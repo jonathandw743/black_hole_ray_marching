@@ -19,6 +19,7 @@ mod uniforms;
 mod vertex;
 mod vertices;
 mod uniformscontroller;
+mod otheruniforms;
 mod podbool;
 
 mod state;
