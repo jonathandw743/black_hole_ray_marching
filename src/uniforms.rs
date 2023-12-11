@@ -1,10 +1,22 @@
-use cgmath::Zero;
+// use cgmath::Zero;
 use wgpu::util::DeviceExt;
 use winit::{
     dpi::PhysicalSize,
     event::*,
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
+};
+
+use glam::{
+    Vec2,
+    Vec3,
+    Vec4,
+    vec2, vec3, vec4, Mat4,
+};
+
+
+use encase::{
+    ShaderType,
 };
 
 use aligned::{Aligned, A16};
@@ -98,21 +110,41 @@ impl AntiAliasingUniform {
     }
 }
 
+#[derive(ShaderType)]
+pub struct CameraUniform {
+    pos: Vec3,
+    view_proj: Mat4,
+}
+
+impl CameraUniform {
+    pub fn new() -> Self {
+        Self {
+            pos: Vec3::ZERO,
+            view_proj: Mat4::IDENTITY,
+        }
+    }
+    pub fn update(&mut self, camera: &Camera) {
+        self.pos = camera.pos;
+        self.view_proj = camera.build_view_projection_matrix();
+    }
+}
+
 // We need this for Rust to store our data correctly for the shaders
-#[repr(C)]
+// #[repr(C)]
 // This is so we can store this in a buffer
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+// #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(ShaderType)]
 pub struct CameraViewProjUniform {
     // We can't use cgmath with bytemuck directly so we'll have
     // to convert the Matrix4 into a 4x4 f32 array
-    view_proj: [[f32; 4]; 4],
+    view_proj: Mat4,
 }
 
 impl CameraViewProjUniform {
     pub fn new() -> Self {
-        use cgmath::SquareMatrix;
+        // use cgmath::SquareMatrix;
         Self {
-            view_proj: cgmath::Matrix4::identity().into(),
+            view_proj: glam::Mat4::IDENTITY.into(),
         }
     }
 

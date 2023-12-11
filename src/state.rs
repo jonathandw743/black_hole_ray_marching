@@ -1,8 +1,12 @@
+use std::f32::consts::PI;
 use std::fmt::Display;
 use std::iter;
-
-use cgmath::num_traits::float;
+use std::num::NonZeroU64;
+use wgpu::ShaderStages;
+// use cgmath::num_traits::float;
 use winit::{event::*, window::Window};
+
+use glam::{vec3, Vec3};
 
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -18,7 +22,7 @@ use crate::texture::Texture;
 // mod settings;
 use crate::settings::{number_from_virtual_key_code, Settings, SettingsController};
 
-use crate::uniforms::{CameraPosUniform, CameraViewProjUniform, OpticalDensityUniform};
+use crate::uniforms::{CameraPosUniform, CameraUniform, CameraViewProjUniform, OpticalDensityUniform};
 
 // mod camera;
 use crate::camera::{Camera, CameraController};
@@ -57,14 +61,18 @@ pub struct State {
     pub camera_controller: CameraController,
 
     // uniforms
-    pub camera_view_proj_uniform: CameraViewProjUniform,
-    pub camera_view_proj_buffer: wgpu::Buffer,
-    pub camera_pos_uniform: CameraPosUniform,
-    pub camera_pos_buffer: wgpu::Buffer,
-    pub camera_bind_group: wgpu::BindGroup,
-
-    pub uniform_controller_group: UniformControllerGroup<6>,
+    // pub camera_view_proj_uniform: CameraViewProjUniform,
+    // pub camera_view_proj_buffer: wgpu::Buffer,
+    // pub camera_pos_uniform: CameraPosUniform,
+    // pub camera_pos_buffer: wgpu::Buffer,
+    // pub camera_bind_group: wgpu::BindGroup,
+    pub camera_uniform: CameraUniform,
+    pub camera_uniform_buffer: wgpu::Buffer,
     pub uniform_bind_group: wgpu::BindGroup,
+
+    // pub uniform_controller_group: UniformControllerGroup<6>,
+    pub other_uniforms: OtherUniforms<6>,
+    pub other_uniforms_buffer: wgpu::Buffer,
 
     pub diffuse_bind_group: wgpu::BindGroup,
 
@@ -72,10 +80,11 @@ pub struct State {
     pub start_of_last_frame_instant: Instant,
     pub delta_time: Duration,
     pub should_render: bool,
+    // pub buffer5: encase::UniformBuffer<Vec<u8>>,
 }
 
 impl State {
-    pub async fn new(window: Window) -> Self {
+    pub async fn new(window: Window, background_image: &[u8]) -> Self {
         let size = window.inner_size();
 
         // The instance is a handle to our GPU
@@ -160,34 +169,83 @@ impl State {
         let camera = Camera {
             pos: (0.0, 0.0, -20.0).into(),
             dir: (0.0, 0.0, 1.0).into(),
-            up: cgmath::Vector3::unit_y(),
+            up: Vec3::Y,
             aspect: config.width as f32 / config.height as f32,
-            fovy: 70.0,
+            fovy: PI * 0.4,
             znear: 0.1,
             zfar: 100.0,
         };
 
+        // camera controller
+
         let camera_controller = CameraController::new(5.0, 0.5);
 
-        let mut camera_pos_uniform = CameraPosUniform::new();
-        camera_pos_uniform.update(&camera);
+        // camera uniform buffer
 
-        let camera_pos_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("camer pos"),
-            contents: bytemuck::cast_slice(&[camera_pos_uniform]),
+        let mut camera_uniform = CameraUniform::new();
+        camera_uniform.update(&camera);
+
+        let camera_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("camer uniforms"),
+            contents: &camera_uniform.uniform_buffer_content(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let mut camera_view_proj_uniform = CameraViewProjUniform::new();
-        camera_view_proj_uniform.update(&camera);
+        // other uniforms
+        let other_uniforms = OtherUniforms::new(
+            VirtualKeyCode::PageUp,
+            VirtualKeyCode::PageDown,
+            [
+                OtherUniform {
+                    label: "swartschild radius".into(),
+                    // shader_stage: ShaderStages::FRAGMENT,
+                    inc_value: Box::new(IncValue { value: 1.0, inc: 0.2 }),
+                },
+                OtherUniform {
+                    label: "max delta time".into(),
+                    inc_value: Box::new(IncValue { value: 0.3, inc: 0.02 }),
+                },
+                OtherUniform {
+                    label: "background brightness".into(),
+                    inc_value: Box::new(IncValue { value: 0.5, inc: 0.1 }),
+                },
+                OtherUniform {
+                    label: "blackout event horizon".into(),
+                    inc_value: Box::new(IncValue {
+                        value: PodBool::r#false(),
+                        inc: PodBool::r#true(),
+                    }),
+                },
+                OtherUniform {
+                    label: "max view distance".into(),
+                    inc_value: Box::new(IncValue { value: 30.0, inc: 1.0 }),
+                },
+                OtherUniform {
+                    label: "distortion power".into(),
+                    inc_value: Box::new(IncValue { value: 1.0, inc: 0.2 }),
+                },
+            ],
+        );
 
-        let camera_view_proj_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("camer view proj"),
-            contents: bytemuck::cast_slice(&[camera_view_proj_uniform]),
+        dbg!(other_uniforms.uniform_buffer_content());
+        dbg!(other_uniforms.uniform_buffer_content().len());
+        let data = other_uniforms.uniform_buffer_content();
+        let mut d: [u8; 1284] = unsafe {std::mem::zeroed()};
+        for (i, x) in data.iter().enumerate() {
+            d[i] = *x;
+        }
+        dbg!(std::mem::size_of_val(&d));
+        dbg!(std::mem::size_of_val(&other_uniforms.uniform_buffer_content()));
+
+        let other_uniforms_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("camer uniforms"),
+            contents: &other_uniforms.uniform_buffer_content(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let camera_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        // uniform bind group
+
+        let uniform_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -201,7 +259,7 @@ impl State {
                 },
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
-                    visibility: wgpu::ShaderStages::VERTEX,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -213,16 +271,16 @@ impl State {
             label: Some("camera uniforms"),
         });
 
-        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &camera_bind_group_layout,
+        let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &uniform_bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: camera_pos_buffer.as_entire_binding(),
+                    resource: camera_uniform_buffer.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: camera_view_proj_buffer.as_entire_binding(),
+                    resource: other_uniforms_buffer.as_entire_binding(),
                 },
             ],
             label: Some("camera uniforms"),
@@ -230,75 +288,77 @@ impl State {
 
         // uniforms
 
-        let uniform_controller_group = UniformControllerGroup::new(
-            [
-                Box::new(UniformController {
-                    uniform: UniformAndBuffer::new(
-                        "schwarzschild radius".into(),
-                        1.0,
-                        &device,
-                        wgpu::ShaderStages::FRAGMENT,
-                    ),
-                    increment: 0.1,
-                    positive_modifier_key_code: VirtualKeyCode::PageUp,
-                    negative_modifier_key_code: VirtualKeyCode::PageDown,
-                }),
-                Box::new(UniformController {
-                    uniform: UniformAndBuffer::new("max delta time".into(), 0.2, &device, wgpu::ShaderStages::FRAGMENT),
-                    increment: 0.02,
-                    positive_modifier_key_code: VirtualKeyCode::PageUp,
-                    negative_modifier_key_code: VirtualKeyCode::PageDown,
-                }),
-                Box::new(UniformController {
-                    uniform: UniformAndBuffer::new(
-                        "background brightness".into(),
-                        0.5,
-                        &device,
-                        wgpu::ShaderStages::FRAGMENT,
-                    ),
-                    increment: 0.1,
-                    positive_modifier_key_code: VirtualKeyCode::PageUp,
-                    negative_modifier_key_code: VirtualKeyCode::PageDown,
-                }),
-                Box::new(UniformController {
-                    uniform: UniformAndBuffer::new(
-                        "blackout event horizon".into(),
-                        PodBool::r#false(),
-                        &device,
-                        wgpu::ShaderStages::FRAGMENT,
-                    ),
-                    increment: PodBool::r#true(),
-                    positive_modifier_key_code: VirtualKeyCode::PageUp,
-                    negative_modifier_key_code: VirtualKeyCode::PageDown,
-                }),
-                Box::new(UniformController {
-                    uniform: UniformAndBuffer::new("max view dist".into(), 30.0, &device, wgpu::ShaderStages::FRAGMENT),
-                    increment: 1.0,
-                    positive_modifier_key_code: VirtualKeyCode::PageUp,
-                    negative_modifier_key_code: VirtualKeyCode::PageDown,
-                }),
-                Box::new(UniformController {
-                    uniform: UniformAndBuffer::new(
-                        "distortion power".into(),
-                        1.0,
-                        &device,
-                        wgpu::ShaderStages::FRAGMENT,
-                    ),
-                    increment: 1.0,
-                    positive_modifier_key_code: VirtualKeyCode::PageUp,
-                    negative_modifier_key_code: VirtualKeyCode::PageDown,
-                }),
-            ],
-            true,
-        );
+        // let uniform_controller_group = UniformControllerGroup::new(
+        //     [
+        //         Box::new(UniformController {
+        //             uniform: UniformAndBuffer::new(
+        //                 "schwarzschild radius".into(),
+        //                 1.0,
+        //                 &device,
+        //                 wgpu::ShaderStages::FRAGMENT,
+        //             ),
+        //             increment: 0.1,
+        //             positive_modifier_key_code: VirtualKeyCode::PageUp,
+        //             negative_modifier_key_code: VirtualKeyCode::PageDown,
+        //         }),
+        //         Box::new(UniformController {
+        //             uniform: UniformAndBuffer::new("max delta time".into(), 0.3, &device, wgpu::ShaderStages::FRAGMENT),
+        //             increment: 0.02,
+        //             positive_modifier_key_code: VirtualKeyCode::PageUp,
+        //             negative_modifier_key_code: VirtualKeyCode::PageDown,
+        //         }),
+        //         Box::new(UniformController {
+        //             uniform: UniformAndBuffer::new(
+        //                 "background brightness".into(),
+        //                 0.5,
+        //                 &device,
+        //                 wgpu::ShaderStages::FRAGMENT,
+        //             ),
+        //             increment: 0.1,
+        //             positive_modifier_key_code: VirtualKeyCode::PageUp,
+        //             negative_modifier_key_code: VirtualKeyCode::PageDown,
+        //         }),
+        //         Box::new(UniformController {
+        //             uniform: UniformAndBuffer::new(
+        //                 "blackout event horizon".into(),
+        //                 PodBool::r#false(),
+        //                 &device,
+        //                 wgpu::ShaderStages::FRAGMENT,
+        //             ),
+        //             increment: PodBool::r#true(),
+        //             positive_modifier_key_code: VirtualKeyCode::PageUp,
+        //             negative_modifier_key_code: VirtualKeyCode::PageDown,
+        //         }),
+        //         Box::new(UniformController {
+        //             uniform: UniformAndBuffer::new("max view dist".into(), 30.0, &device, wgpu::ShaderStages::FRAGMENT),
+        //             increment: 1.0,
+        //             positive_modifier_key_code: VirtualKeyCode::PageUp,
+        //             negative_modifier_key_code: VirtualKeyCode::PageDown,
+        //         }),
+        //         Box::new(UniformController {
+        //             uniform: UniformAndBuffer::new(
+        //                 "distortion power".into(),
+        //                 1.0,
+        //                 &device,
+        //                 wgpu::ShaderStages::FRAGMENT,
+        //             ),
+        //             increment: 1.0,
+        //             positive_modifier_key_code: VirtualKeyCode::PageUp,
+        //             negative_modifier_key_code: VirtualKeyCode::PageDown,
+        //         }),
+        //     ],
+        //     true,
+        // );
 
-        let (uniform_bind_group_layout, uniform_bind_group) =
-            uniform_controller_group.bind_group(&device, Some("uniforms"));
+        // let (uniform_bind_group_layout, uniform_bind_group) =
+        //     uniform_controller_group.bind_group(&device, Some("uniforms"));
+
+        // diffuse texture stuff
 
         surface.configure(&device, &config);
         surface.configure(&device, &config);
-        let diffuse_bytes = include_bytes!("space.jpg");
-        let diffuse_texture = Texture::from_bytes(&device, &queue, diffuse_bytes, "space.png").unwrap();
+        let diffuse_bytes = background_image;
+        let diffuse_texture = Texture::from_bytes(&device, &queue, diffuse_bytes, "space").unwrap();
 
         let diffuse_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
@@ -346,7 +406,7 @@ impl State {
             bind_group_layouts: &[
                 //// &resolution_bind_group_layout,
                 //// &anti_ailiasing_bind_group_layout,
-                &camera_bind_group_layout,
+                // &camera_bind_group_layout,
                 &uniform_bind_group_layout,
                 &diffuse_bind_group_layout,
             ],
@@ -433,21 +493,27 @@ impl State {
             settings_controller,
             camera,
             camera_controller,
-            camera_view_proj_uniform,
-            camera_view_proj_buffer,
-            camera_pos_uniform,
-            camera_pos_buffer,
+            // camera_view_proj_uniform,
+            // camera_view_proj_buffer,
+            // camera_pos_uniform,
+            // camera_pos_buffer,
+            camera_uniform,
+            camera_uniform_buffer,
 
-            camera_bind_group,
+            // camera_uniform_bind_group,
 
-            uniform_controller_group,
+            // uniform_controller_group,
             uniform_bind_group,
+
+            other_uniforms,
+            other_uniforms_buffer,
 
             diffuse_bind_group,
 
             start_of_last_frame_instant: last_frame_time,
             delta_time,
             should_render,
+            // buffer5,
         }
     }
 
@@ -468,9 +534,18 @@ impl State {
     #[allow(unused_variables)]
     pub fn input(&mut self, event: &WindowEvent) -> bool {
         // allow controllers to process the event
+        let other_uniforms_event_result = self.other_uniforms.process_event(event);
+        if other_uniforms_event_result {
+            self.queue.write_buffer(
+                &self.other_uniforms_buffer,
+                0,
+                &self.other_uniforms.uniform_buffer_content(),
+            );
+            dbg!(self.other_uniforms.uniform_buffer_content().len());
+        }
         [
             self.settings_controller.process_event(event),
-            self.uniform_controller_group.process_event(event, &self.queue),
+            other_uniforms_event_result,
             self.camera_controller.process_event(event),
         ]
         .iter()
@@ -478,6 +553,7 @@ impl State {
     }
 
     pub fn update(&mut self) {
+        flame::start("update");
         self.delta_time = self.start_of_last_frame_instant.elapsed();
         // println!("{:?}", self.delta_time);
         self.start_of_last_frame_instant += self.delta_time;
@@ -486,35 +562,64 @@ impl State {
         self.should_render = self.camera_controller.update_camera(&mut self.camera, self.delta_time);
         self.should_render = true;
         // camera update camera uniform and buffer
-        self.camera_view_proj_uniform.update(&self.camera);
+        // self.camera_view_proj_uniform.update(&self.camera);
+        flame::start("update camera");
+        self.camera_uniform.update(&self.camera);
+        flame::end("update camera");
+
+        // let mut buffer5 = encase::UniformBuffer::new(Vec::new());
+        // buffer5.write(&self.camera_view_proj_uniform).unwrap();
+        // let byte_buffer5 = buffer5.into_inner();
+        // // self.queue.write_buffer_with(&self.camera_view_proj_buffer, 0, )
+        // self.queue.write_buffer(&self.camera_view_proj_buffer, 0, &byte_buffer5);
+        // self.camera_pos_uniform.update(&self.camera);
+        flame::start("getting data");
+        let data = self.camera_uniform.uniform_buffer_content();
+        let mut d: [u8; 80] = unsafe {std::mem::zeroed()};
+        for (i, x) in data.iter().enumerate() {
+            d[i] = *x;
+        }
+        // let stuff_to_send: &[u8] = bytemuck::cast_slice(&[0u8; 80]);
+        let stuff_to_send: &[u8] = bytemuck::cast_slice(&d);
+        flame::end("getting data");
+        dbg!(data.len());
+        flame::start("queue");
         self.queue.write_buffer(
-            &self.camera_view_proj_buffer,
+            &self.camera_uniform_buffer,
             0,
-            bytemuck::cast_slice(&[self.camera_view_proj_uniform]),
+            stuff_to_send,
         );
-        self.camera_pos_uniform.update(&self.camera);
-        self.queue.write_buffer(
-            &self.camera_pos_buffer,
-            0,
-            bytemuck::cast_slice(&[self.camera_pos_uniform]),
-        );
+        flame::end("queue");
+        flame::end("update");
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        flame::start("render");
         if !self.should_render {
             return Ok(());
         }
 
+        flame::start("render setup");
         // the output texture for the render
+        flame::start("gct");
+        // this takes way too long (like it does initially on startup)
         let output = self.surface.get_current_texture()?;
+        dbg!(std::mem::size_of_val(&output));
+        flame::end("gct");
         // a way to access this output texture
+        flame::start("cv");
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        flame::end("cv");
 
+        flame::start("encoder");
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
+        flame::end("encoder");
+        flame::end("render setup");
 
         {
+            flame::start("rp");
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -534,21 +639,35 @@ impl State {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
+            flame::end("rp");
 
+            flame::start("vertex and index buffers");
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            flame::end("vertex and index buffers");
+            flame::start("sbg 0");
 
-            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
-            render_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
+            
+            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            // render_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
+            flame::end("sbg 0");
+            flame::start("sbg 1");
 
-            render_pass.set_bind_group(2, &self.diffuse_bind_group, &[]);
-
+            render_pass.set_bind_group(1, &self.diffuse_bind_group, &[]);
+            flame::end("sbg 1");
+            
+            flame::start("draw call");
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+            flame::end("draw call");
         }
 
+        flame::start("output");
         self.queue.submit(iter::once(encoder.finish()));
         output.present();
+        flame::end("output");
 
+
+        flame::end("render");
         Ok(())
     }
 

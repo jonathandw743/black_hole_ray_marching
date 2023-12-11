@@ -25,6 +25,7 @@ mod state;
 use state::State;
 
 use std::time::{Duration, Instant};
+use std::fs::File;
 
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
@@ -60,10 +61,16 @@ pub async fn run() {
             })
             .expect("Couldn't append canvas to document body.");
     }
-
+    
+    // the browser can't handle the width-4096 bg image
+    #[cfg(target_arch = "wasm32")]
+    let background_image = include_bytes!("space-browser.jpg");
+    #[cfg(not(target_arch = "wasm32"))]
+    let background_image = include_bytes!("space.jpg");
+    
     // State::new uses async code, so we're going to wait for it to finish
-    let mut state = State::new(window).await;
-
+    let mut state = State::new(window, background_image).await;
+    
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::WindowEvent { ref event, window_id } if window_id == state.window().id() => {
@@ -80,39 +87,45 @@ pub async fn run() {
                                     virtual_keycode: Some(VirtualKeyCode::Escape),
                                     ..
                                 },
-                            ..
-                        } => *control_flow = ControlFlow::Exit,
-                        WindowEvent::Resized(physical_size) => {
-                            state.resize(*physical_size);
+                                ..
+                            } => *control_flow = ControlFlow::Exit,
+                            WindowEvent::Resized(physical_size) => {
+                                state.resize(*physical_size);
+                            }
+                            WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                                // new_inner_size is &&mut so w have to dereference it twice
+                                state.resize(**new_inner_size);
+                            }
+                            _ => {}
                         }
-                        WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                            // new_inner_size is &&mut so w have to dereference it twice
-                            state.resize(**new_inner_size);
-                        }
-                        _ => {}
                     }
                 }
-            }
-            Event::RedrawRequested(window_id) if window_id == state.window().id() => {
-                // state.render();
-                match state.render() {
-                    Ok(_) => {}
-                    // Reconfigure the surface if it's lost or outdated
-                    Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => state.resize(state.size),
-                    // The system is out of memory, we should probably quit
-                    Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-                    
-                    Err(wgpu::SurfaceError::Timeout) => log::warn!("Surface timeout"),
+                Event::RedrawRequested(window_id) if window_id == state.window().id() => {
+                    // state.render();
+                    match state.render() {
+                        Ok(_) => {}
+                        // Reconfigure the surface if it's lost or outdated
+                        Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => state.resize(state.size),
+                        // The system is out of memory, we should probably quit
+                        Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
+                        
+                        Err(wgpu::SurfaceError::Timeout) => log::warn!("Surface timeout"),
+                    }
+                    state.update();
+                    state.sleep();
                 }
-                state.update();
-                state.sleep();
-            }
-            Event::RedrawEventsCleared => {
-                // RedrawRequested will only trigger once, unless we manually
-                // request it.
-                state.window().request_redraw();
-            }
-            _ => {}
+                Event::RedrawEventsCleared => {
+                    // RedrawRequested will only trigger once, unless we manually
+                    // request it.
+                    state.window().request_redraw();
+                }
+                Event::LoopDestroyed => {
+                    println!("hello ended");
+                    flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
+                }
+                _ => {}
+                
         }
     });
+    
 }

@@ -1,9 +1,14 @@
 // Vertex shader
+struct Camera {
+    // 0 bytes
+    pos: vec3<f32>,
+    view_proj: mat4x4<f32>,
+    // 76 bytes
+    // _padding: u32,
+    // 80 bytes (16x5)
+}
 @group(0) @binding(0) // 1.
-var<uniform> camera_pos: vec3<f32>;
-
-@group(0) @binding(1) // 1.
-var<uniform> camera_view_proj: mat4x4<f32>;
+var<uniform> camera: Camera;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -20,25 +25,40 @@ fn vs_main(
     model: VertexInput,
 ) -> VertexOutput {
     var out: VertexOutput;
-    out.camera_to_vertex = model.position - camera_pos;
-    out.clip_position = camera_view_proj * vec4<f32>(model.position, 1.0); // 2.
+    out.camera_to_vertex = model.position - camera.pos.xyz;
+    out.clip_position = camera.view_proj * vec4<f32>(model.position, 1.0); // 2.
     out.position = model.position;
     return out;
 }
 
 // Fragment shader
-@group(1) @binding(0)
-var<uniform> RS: f32;
-@group(1) @binding(1)
-var<uniform> MAX_DELTA_TIME: f32;
-@group(1) @binding(2)
-var<uniform> BG_BRIGHTNESS: f32;
-@group(1) @binding(3)
-var<uniform> BLACKOUT_EH: u32;
-@group(1) @binding(4)
-var<uniform> MAX_DIST: f32;
-@group(1) @binding(5)
-var<uniform> DISTORTION_POWER: f32;
+struct Uniforms {
+    // 0 bytes
+    RS: f32,
+    MAX_DELTA_TIME: f32,
+    BG_BRIGHTNESS: f32,
+    BLACKOUT_EH: u32,
+    MAX_DIST: f32,
+    DISTORTION_POWER: f32,
+    // 24 bytes
+    // _padding: vec2<u32>,
+    // 32 bytes (16x2)
+}
+
+@group(0) @binding(1)
+var<uniform> u: Uniforms;
+// @group(1) @binding(0)
+// var<uniform> RS: f32;
+// @group(1) @binding(1)
+// var<uniform> MAX_DELTA_TIME: f32;
+// @group(1) @binding(2)
+// var<uniform> BG_BRIGHTNESS: f32;
+// @group(1) @binding(3)
+// var<uniform> BLACKOUT_EH: u32;
+// @group(1) @binding(4)
+// var<uniform> MAX_DIST: f32;
+// @group(1) @binding(5)
+// var<uniform> DISTORTION_POWER: f32;
 
 const MIN_DIST = 0.001;
 const EPSILON_VEC: vec2<f32> = vec2<f32>(1e-3, 0.0);
@@ -83,7 +103,7 @@ fn sdf_accretion_disk(p: vec3<f32>, centre: vec3<f32>, big_r: f32, little_r: f32
 fn get_dist(p: vec3<f32>) -> f32 {
     // let sd_sphere_bh = sdf_sphere(p, vec3<f32>(0.0, 0.0, 0.0), 0.8);
 
-    let sd_accretion_disk = sdf_accretion_disk(p, vec3<f32>(0.0), 5.0 * RS, 3.0 * RS);
+    let sd_accretion_disk = sdf_accretion_disk(p, vec3<f32>(0.0), 5.0 * u.RS, 3.0 * u.RS);
 
     // return min(sd_sphere_bh, sd_accretion_disk);
     return sd_accretion_disk;
@@ -92,12 +112,12 @@ fn get_dist(p: vec3<f32>) -> f32 {
 fn rd_derivative(ro: vec3<f32>, h2: f32) -> vec3<f32> {
     // return vec3<f32>(0.0);
 
-    return DISTORTION_POWER * -1.5 * h2 * ro / pow(dot(ro, ro), 2.5);
+    return u.DISTORTION_POWER * -1.5 * h2 * ro / pow(dot(ro, ro), 2.5);
 }
 
-@group(2) @binding(0)
+@group(1) @binding(0)
 var t_diffuse: texture_2d<f32>;
-@group(2)@binding(1)
+@group(1) @binding(1)
 var s_diffuse: sampler;
 
 fn tsw(t_diffuse: texture_2d<f32>, s_difuse: sampler, tex_coords: vec2<f32>) -> vec4<f32> {
@@ -118,7 +138,7 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
     for (var i = 0; i < MAX_ITERATIONS; i++) {
 
         let dist_to_bh_sq = dot(ro, ro);
-        if u32_to_bool(BLACKOUT_EH) && dist_to_bh_sq < 1.0 {
+        if u32_to_bool(u.BLACKOUT_EH) && dist_to_bh_sq < 1.0 {
             return vec3<f32>(0.0);
         }
 
@@ -135,7 +155,7 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
         let dist = min(dist_0, ps_dist);
         
         // can interpret dist as a time due to c = 1
-        var delta_time = min(MAX_DELTA_TIME, dist);
+        var delta_time = min(u.MAX_DELTA_TIME, dist);
 
         let ro_k1 = delta_time * rd;
         let rd_k1 = delta_time * rd_derivative(ro, h2);
@@ -156,7 +176,7 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
         rd += delta_rd;
 
         distance_travelled += delta_time;
-        if distance_travelled > MAX_DIST {
+        if distance_travelled > u.MAX_DIST {
             // return vec3<f32>(0.0, 1.0, 1.0);
             break;
         }        
@@ -244,7 +264,7 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let ray_dir = normalize(in.camera_to_vertex);
-    let col = get_col(camera_pos, ray_dir);
+    let col = get_col(camera.pos.xyz, ray_dir);
     return vec4<f32>(col, 1.0);
 }
 

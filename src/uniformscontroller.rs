@@ -1,7 +1,12 @@
+use std::fmt::Debug;
 use std::iter;
+use std::marker::PhantomData;
+use std::num::NonZeroU64;
 use std::ops::{Add, Sub};
 
-use cgmath::num_traits::float;
+use encase::internal::{WriteInto, Writer};
+use encase::{DynamicUniformBuffer, ShaderType, UniformBuffer};
+// use cgmath::num_traits::float;
 use wgpu::{Queue, ShaderStages};
 use winit::{event::*, window::Window};
 
@@ -74,14 +79,14 @@ pub trait Increment<T> {
     // fn decrement(&self, other: Self) -> Self;
 }
 
-impl Opposite<f32> for f32 {
-    fn opposite(&self) -> f32 {
+impl Opposite<Self> for f32 {
+    fn opposite(&self) -> Self {
         -self
     }
 }
 
-impl Increment<f32> for f32 {
-    fn increment(&self, other: &f32) -> Self {
+impl Increment<Self> for f32 {
+    fn increment(&self, other: &Self) -> Self {
         self + other
     }
     // fn decrement(&self, other: Self) -> Self {
@@ -89,14 +94,14 @@ impl Increment<f32> for f32 {
     // }
 }
 
-impl Opposite<bool> for bool {
-    fn opposite(&self) -> bool {
+impl Opposite<Self> for bool {
+    fn opposite(&self) -> Self {
         self.to_owned()
     }
 }
 
-impl Increment<bool> for bool {
-    fn increment(&self, other: &bool) -> Self {
+impl Increment<Self> for bool {
+    fn increment(&self, other: &Self) -> Self {
         self ^ other
     }
 }
@@ -226,7 +231,6 @@ impl<const N: usize> UniformControllerGroup<N> {
         }
     }
     pub fn bind_group(&self, device: &wgpu::Device, label: Option<&str>) -> (wgpu::BindGroupLayout, wgpu::BindGroup) {
-        
         // ! idk stfu
         let mut layout_entries: [wgpu::BindGroupLayoutEntry; N] = unsafe { std::mem::zeroed() };
         for (i, uniform_controller) in self.uniform_controllers.iter().enumerate() {
@@ -240,20 +244,20 @@ impl<const N: usize> UniformControllerGroup<N> {
                 },
                 count: None,
             }
-        };
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor{
+        }
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label,
             entries: &layout_entries,
         });
 
         // ! idk stfu
-        let mut entries: [wgpu::BindGroupEntry; N]  = unsafe { std::mem::zeroed() };
+        let mut entries: [wgpu::BindGroupEntry; N] = unsafe { std::mem::zeroed() };
         for (i, uniform_controller) in self.uniform_controllers.iter().enumerate() {
             entries[i] = wgpu::BindGroupEntry {
                 binding: i as u32,
                 resource: uniform_controller.get_buffer().as_entire_binding(),
             }
-        };
+        }
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &layout,
             entries: &entries,
@@ -288,6 +292,210 @@ impl<const N: usize> UniformControllerGroup<N> {
                     if modifier_number < N {
                         self.uniform_controllers[modifier_number].process_event(event, queue, self.logging);
                         return true;
+                    }
+                }
+                false
+            }
+            _ => false,
+        }
+    }
+}
+
+// mental gymnastics begins
+
+pub trait BufferContent {
+    fn storage_buffer_content(&self) -> Vec<u8>;
+    fn uniform_buffer_content(&self) -> Vec<u8>;
+}
+
+impl<T> BufferContent for T
+where
+    T: ShaderType + WriteInto,
+{
+    fn storage_buffer_content(&self) -> Vec<u8> {
+        let mut buffer = encase::StorageBuffer::new(Vec::new());
+        buffer.write(self).unwrap();
+        buffer.into_inner()
+    }
+
+    fn uniform_buffer_content(&self) -> Vec<u8> {
+        let mut buffer = encase::UniformBuffer::new(Vec::new());
+        buffer.write(self).unwrap();
+        buffer.into_inner()
+    }
+}
+
+pub struct OtherUniform {
+    pub label: String,
+    // pub shader_stage: ShaderStages,
+    pub inc_value: Box<dyn IncValueTrait>,
+}
+
+pub struct IncValue<T, I>
+where
+    T: Increment<I>,
+    I: Opposite<I>,
+    T: ShaderType + WriteInto,
+{
+    pub value: T,
+    pub inc: I,
+}
+
+pub trait IncValueTrait {
+    fn increment(&mut self);
+    fn decrement(&mut self);
+    // fn uniform_buffer_content(&self) -> Vec<u8>;
+    fn raw_data(&self) -> Vec<u8>;
+    // could change this into a more generic UniformBuffer thing like encase does
+    // fn write_into_buffer(&self, buffer: &mut DynamicUniformBuffer<Vec<u8>>);
+    fn write_into(&self, writer: &mut Writer<&mut Vec<u8>>);
+    fn size(&self) -> NonZeroU64;
+    // fn new_writer(&self, buffer: &mut Vec<u8>, offset: usize) -> Writer<&mut Vec<u8>>;
+    fn write_into_buffer(&self, buffer: &mut Vec<u8>, offset: usize);
+}
+
+impl<T, I> IncValueTrait for IncValue<T, I>
+where
+    T: Increment<I>,
+    I: Opposite<I>,
+    T: ShaderType + WriteInto,
+{
+    fn increment(&mut self) {
+        self.value = self.value.increment(&self.inc);
+    }
+    fn decrement(&mut self) {
+        self.value = self.value.increment(&self.inc.opposite());
+    }
+    // fn uniform_buffer_content(&self) -> Vec<u8> {
+    //     self.value.uniform_buffer_content()
+    // }
+    fn raw_data(&self) -> Vec<u8> {
+        let size = std::mem::size_of::<T>();
+        let mut result = Vec::with_capacity(size);
+
+        unsafe {
+            let value_ptr = &self.value as *const T as *const u8;
+            std::ptr::copy(value_ptr, result.as_mut_ptr(), size);
+            result.set_len(size);
+        }
+
+        result
+    }
+    // fn write_into_buffer(&self, buffer: &mut DynamicUniformBuffer<Vec<u8>>) {
+    //     // let x = buffer.write(&self.value);
+    //     buffer.write(&self.value).unwrap();
+    //     // dbg!(x);
+    //     // let mut v: Vec<f32> = Vec::new();
+    //     // println!("hello");
+    //     // let v: Result<[glam::Vec4; 1], _> = buffer.create();
+    //     // dbg!(v);
+    // }
+    fn write_into(&self, writer: &mut Writer<&mut Vec<u8>>) {
+        self.value.write_into(writer);
+    }
+    fn size(&self) -> NonZeroU64 {
+        self.value.size()
+    }
+    // fn new_writer(&self, buffer: &mut Vec<u8>, offset: usize) -> Writer<&mut Vec<u8>> {
+    //     Writer::new(&self.value, buffer, offset).unwrap()
+    // }
+    fn write_into_buffer(&self, buffer: &mut Vec<u8>, offset: usize) {
+        let mut writer = Writer::new(&self.value, buffer, offset).unwrap();
+        self.value.write_into(&mut writer);
+    }
+}
+
+// mental gymnastics ends
+
+pub struct OtherUniforms<const N: usize> {
+    pub positive_modifier_key_code: VirtualKeyCode,
+    pub negative_modifier_key_code: VirtualKeyCode,
+    pub other_uniforms: [OtherUniform; N],
+    pub modifier_number_pressed: Option<usize>,
+}
+
+// impl<const N: usize> BufferContent for OtherUniforms<N> {
+//     fn storage_buffer_content(&self) -> Vec<u8> {
+//         let mut buffer = encase::StorageBuffer::new(self.raw_data());
+//         buffer.write(&glam::Vec2::ZERO);
+//         buffer.into_inner()
+//     }
+//     fn uniform_buffer_content(&self) -> Vec<u8> {
+//         let mut buffer = encase::UniformBuffer::new(self.raw_data());
+//         buffer.write(&glam::Vec2::ZERO);
+//         buffer.into_inner()
+//     }
+// }
+
+impl<const N: usize> OtherUniforms<N> {
+    pub fn new(
+        positive_modifier_key_code: VirtualKeyCode,
+        negative_modifier_key_code: VirtualKeyCode,
+        other_uniforms: [OtherUniform; N],
+    ) -> Self {
+        Self {
+            positive_modifier_key_code,
+            negative_modifier_key_code,
+            other_uniforms,
+            modifier_number_pressed: None,
+        }
+    }
+    pub fn raw_data(&self) -> Vec<u8> {
+        self.other_uniforms
+            .iter()
+            .flat_map(|other_uniform| other_uniform.inc_value.raw_data())
+            .collect()
+    }
+    pub fn uniform_buffer_content(&self) -> Vec<u8> {
+        let mut buffer: Vec<u8> = Vec::new();
+        let mut pos = 0;
+        for other_uniform in &self.other_uniforms {
+            {
+                other_uniform.inc_value.write_into_buffer(&mut buffer, pos);
+                pos += other_uniform.inc_value.size().get() as usize;
+            }
+        }
+        buffer
+    }
+    pub fn process_event(&mut self, event: &WindowEvent) -> bool {
+        match event {
+            WindowEvent::KeyboardInput {
+                input:
+                    KeyboardInput {
+                        state,
+                        virtual_keycode: Some(virtual_key_code),
+                        ..
+                    },
+                ..
+            } => {
+                let is_pressed = match state {
+                    ElementState::Pressed => true,
+                    ElementState::Released => false,
+                };
+                if !is_pressed {
+                    return false;
+                }
+                if let Some(number) = number_from_virtual_key_code(virtual_key_code) {
+                    self.modifier_number_pressed = Some(number);
+                    println!(
+                        "{}",
+                        match self.other_uniforms.get(number) {
+                            Some(other_uniform) => format!("{} selected", other_uniform.label),
+                            None => "nothing selected".into(),
+                        }
+                    );
+                    return true;
+                }
+                if let Some(modifier_number) = self.modifier_number_pressed {
+                    if modifier_number < N {
+                        if *virtual_key_code == self.positive_modifier_key_code {
+                            self.other_uniforms[modifier_number].inc_value.increment();
+                            return true;
+                        }
+                        if *virtual_key_code == self.negative_modifier_key_code {
+                            self.other_uniforms[modifier_number].inc_value.decrement();
+                            return true;
+                        }
                     }
                 }
                 false

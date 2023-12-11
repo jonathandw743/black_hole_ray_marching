@@ -2,14 +2,16 @@ use std::time::Duration;
 
 use winit::event::*;
 
-use cgmath::prelude::*;
+// use cgmath::prelude::*;
 
-use cgmath::{Quaternion, Rad};
+// use cgmath::{Quaternion, Rad};
+
+use glam::{Vec3, vec3, Mat4, mat4, vec4, Vec4, Quat};
 
 pub struct Camera {
-    pub pos: cgmath::Point3<f32>,
-    pub dir: cgmath::Vector3<f32>,
-    pub up: cgmath::Vector3<f32>,
+    pub pos: Vec3,
+    pub dir: Vec3,
+    pub up: Vec3,
 
     pub aspect: f32,
     pub fovy: f32,
@@ -18,19 +20,19 @@ pub struct Camera {
 }
 
 #[rustfmt::skip]
-pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
-    1.0, 0.0, 0.0, 0.0,
-    0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, 0.5, 0.0,
-    0.0, 0.0, 0.5, 1.0,
+pub const OPENGL_TO_WGPU_MATRIX: Mat4 = mat4(
+    vec4(1.0, 0.0, 0.0, 0.0),
+    vec4(0.0, 1.0, 0.0, 0.0),
+    vec4(0.0, 0.0, 0.5, 0.0),
+    vec4(0.0, 0.0, 0.5, 1.0),
 );
 
 impl Camera {
-    pub fn right(&self) -> cgmath::Vector3<f32> {
-        self.up.cross(self.dir)
+    pub fn right(&self) -> Vec3 {
+        return self.up.cross(self.dir);
     }
 
-    pub fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
+    pub fn build_view_projection_matrix(&self) -> Mat4 {
         // camera's position vector
         let p = self.pos;
         // up vector (normalized)
@@ -41,13 +43,13 @@ impl Camera {
         let r = self.right();
 
         #[rustfmt::skip]
-        let view = cgmath::Matrix4::new(
-            r.x.clone(), u.x.clone(), -f.x.clone(), 0.0,
-            r.y.clone(), u.y.clone(), -f.y.clone(), 0.0,
-            r.z.clone(), u.z.clone(), -f.z.clone(), 0.0,
-            -p.dot(r), -p.dot(u), p.dot(f), 1.0,
+        let view = mat4(
+            vec4(r.x.clone(), u.x.clone(), -f.x.clone(), 0.0),
+            vec4(r.y.clone(), u.y.clone(), -f.y.clone(), 0.0),
+            vec4(r.z.clone(), u.z.clone(), -f.z.clone(), 0.0),
+            vec4(-p.dot(r), -p.dot(u), p.dot(f), 1.0),
         );
-        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
+        let proj = Mat4::perspective_rh(self.fovy, self.aspect, self.znear, self.zfar);
 
         return OPENGL_TO_WGPU_MATRIX * proj * view;
     }
@@ -203,15 +205,15 @@ impl CameraController {
         camera.pos += z_movement * camera.dir;
         camera.pos += y_movement * camera.up;
 
-        let rotation = Quaternion::from_axis_angle(cgmath::Vector3::unit_y(), Rad(x_pan));
-        camera.dir = rotation.rotate_vector(camera.dir);
-        camera.up = rotation.rotate_vector(camera.up);
+        let rotation = Quat::from_axis_angle(Vec3::Y, x_pan);
+        camera.dir = rotation.mul_vec3(camera.dir);
+        camera.up = rotation.mul_vec3(camera.up);
 
         // println!("{:?}", camera.dir);
 
-        let rotation = Quaternion::from_axis_angle(camera.right(), Rad(y_pan));
-        camera.dir = rotation.rotate_vector(camera.dir);
-        camera.up = rotation.rotate_vector(camera.up);
+        let rotation = Quat::from_axis_angle(camera.right(), y_pan);
+        camera.dir = rotation.mul_vec3(camera.dir);
+        camera.up = rotation.mul_vec3(camera.up);
 
         [
             x_movement_norm,
