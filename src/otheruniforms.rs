@@ -107,6 +107,9 @@ impl<const N: usize> OtherUniforms<N> {
                 pos += other_uniform.inc_value.size().get() as usize;
             }
         }
+        for i in (buffer.len()..((buffer.len() as f32 / 16.0).ceil() * 16.0) as usize) {
+            buffer.push(0u8);
+        }
         buffer
     }
     pub fn process_event(&mut self, event: &WindowEvent) -> bool {

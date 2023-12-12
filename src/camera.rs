@@ -105,18 +105,22 @@ impl CameraController {
 
     pub fn process_event(&mut self, event: &WindowEvent) -> bool {
         match event {
-            &WindowEvent::MouseInput { button: winit::event::MouseButton::Left, state, .. } => {
+            &WindowEvent::MouseInput {
+                button: winit::event::MouseButton::Left,
+                state,
+                ..
+            } => {
                 self.mouse_is_pressed = match state {
                     ElementState::Pressed => true,
                     ElementState::Released => false,
                 };
                 true
-            },
+            }
             &WindowEvent::CursorMoved { position, .. } => {
                 self.prev_cursor_position = self.curr_cursor_position;
                 self.curr_cursor_position = Some(position);
                 true
-            },
+            }
             WindowEvent::KeyboardInput {
                 input:
                     KeyboardInput {
@@ -216,13 +220,19 @@ impl CameraController {
         };
         let y_movement = dt * self.speed * y_movement_norm;
 
+        camera.pos += x_movement * camera.right();
+        // camera.pos += z_movement * camera.dir;
+        camera.pos += y_movement * camera.up;
+
+        camera.pos = camera.pos * (-dt * z_movement_norm).exp();
+
         let x_pan_norm = match (self.is_pan_left_pressed, self.is_pan_right_pressed) {
             (false, false) => 0.0,
             (false, true) => 1.0,
             (true, false) => -1.0,
             (true, true) => 0.0,
         };
-        // let x_pan = dt * self.pan_speed * x_pan_norm;
+        let x_pan = dt * self.pan_speed * x_pan_norm;
 
         let y_pan_norm = match (self.is_pan_up_pressed, self.is_pan_down_pressed) {
             (false, false) => 0.0,
@@ -230,13 +240,17 @@ impl CameraController {
             (true, false) => -1.0,
             (true, true) => 0.0,
         };
-        // let y_pan = dt * self.pan_speed * y_pan_norm;
+        let y_pan = dt * self.pan_speed * y_pan_norm;
+
+        let rotation = Quat::from_axis_angle(Vec3::Y, x_pan);
+        camera.dir = rotation.mul_vec3(camera.dir);
+        camera.up = rotation.mul_vec3(camera.up);
+
+        let rotation = Quat::from_axis_angle(camera.right(), y_pan);
+        camera.dir = rotation.mul_vec3(camera.dir);
+        camera.up = rotation.mul_vec3(camera.up);
 
         let pan = dt * self.pan_speed * self.cursor_movement();
-
-        camera.pos += x_movement * camera.right();
-        camera.pos += z_movement * camera.dir;
-        camera.pos += y_movement * camera.up;
 
         if self.mouse_is_pressed && do_pan {
             let rotation = Quat::from_axis_angle(Vec3::Y, pan.x);

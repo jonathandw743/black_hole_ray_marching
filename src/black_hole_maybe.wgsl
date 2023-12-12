@@ -41,7 +41,7 @@ struct Uniforms {
     MAX_DIST: f32,
     DISTORTION_POWER: f32,
     // 24 bytes
-    // _padding: vec2<u32>,
+    _padding: vec2<u32>,
     // 32 bytes (16x2)
 }
 
@@ -80,10 +80,15 @@ fn get_dist(p: vec3<f32>) -> f32 {
     return sd_accretion_disk;
 }
 
+// fn pow_fivehalfs(x: f32) -> f32 {
+//     return x * x * x * inverseSqrt(x);
+// }
+
 fn rd_derivative(ro: vec3<f32>, h2: f32) -> vec3<f32> {
     // return vec3<f32>(0.0);
 
-    return u.DISTORTION_POWER * -1.5 * h2 * ro / pow(dot(ro, ro), 2.5);
+    return u.DISTORTION_POWER * u.RS * -1.5 * h2 * ro / pow(dot(ro, ro), 2.5);
+    // return u.DISTORTION_POWER * u.RS * -1.5 * h2 * ro / pow_fivehalfs(dot(ro, ro));
 }
 
 @group(1) @binding(0)
@@ -101,8 +106,8 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
     // var photon = Photon(ray_origin, ray_dir);
     var ro = ray_origin;
     var rd = ray_dir;
-    let ro_rd_cross = cross(ro, rd);
-    let h2 = dot(ro_rd_cross, ro_rd_cross);
+    var ro_rd_cross = cross(ro, rd);
+    var h2 = dot(ro_rd_cross, ro_rd_cross);
 
     var distance_travelled = 0.0;
     // for (var i = 0; i < (2 * )i32(MAX_DIST / MAX_DELTA_TIME); i++) {
@@ -118,15 +123,17 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
             return vec3<f32>(1.0);
         }
 
-        let ps_dist = sdf_sphere(ro, -normalize(ray_origin) * 1.5, 0.075);
+        let ps_dist = sdf_sphere(ro, -normalize(ray_origin) * 1.5 * u.RS, 0.075);
         if ps_dist < MIN_DIST {
             return vec3<f32>(1.0, 1.0, 0.0);
         }
 
         let dist = min(dist_0, ps_dist);
         
+        let rate_of_change_of_rd = rd_derivative(ro, h2);
+
         // can interpret dist as a time due to c = 1
-        var delta_time = min(u.MAX_DELTA_TIME, dist);
+        var delta_time = min(u.MAX_DELTA_TIME, dist * 0.5);
 
         let ro_k1 = delta_time * rd;
         let rd_k1 = delta_time * rd_derivative(ro, h2);
@@ -145,6 +152,9 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
 
         ro += delta_ro;
         rd += delta_rd;
+        
+        ro_rd_cross = cross(ro, rd);
+        h2 = dot(ro_rd_cross, ro_rd_cross);
 
         distance_travelled += delta_time;
         if distance_travelled > u.MAX_DIST {
@@ -152,6 +162,11 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
             break;
         }        
     }
+    // let b = sqrt(dot(ray_origin, ray_origin) + dot(ray_dir, ray_origin) * dot(ray_dir, ray_origin));
+    // let lro = length(ray_origin);
+    // // let angle = atan2(b, lro) + 2.0 * u.RS / b;
+    // let angle = 2.0 * u.RS / b;
+    // rd = normalize(ray_dir * cos(angle) + cross(ro_rd_cross, ray_dir) * sin(angle) + ro_rd_cross * dot(ro_rd_cross, ray_dir) * (1.0 - cos(angle)));
     // let 
     let x = (atan2(rd.z, rd.x) + TWO_PI * 0.5) / TWO_PI;
     let y = (-rd.y + 1.0) * 0.5;
@@ -248,7 +263,7 @@ fn min_dist(d0: Distance, d1: Distance) -> Distance {
     return d1;
 }
 fn ray_march(ro: vec3<f32>, rd: vec3<f32>) -> Distance {
-    discard;
+    return Distance(0.0, false);
 }
 
 fn shadow_light_multiplier(p: vec3<f32>, normal: vec3<f32>, light_dir: vec3<f32>, light_dist_sq: Distance) -> f32 {

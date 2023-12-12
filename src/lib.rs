@@ -21,6 +21,7 @@ mod vertices;
 mod uniformscontroller;
 mod otheruniforms;
 mod podbool;
+mod time_replacement;
 
 mod state;
 use state::State;
@@ -123,8 +124,8 @@ pub async fn run() {
                     state.window().request_redraw();
                 }
                 Event::LoopDestroyed => {
-                    println!("hello ended");
-                    flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
+                    // println!("hello ended");
+                    // flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
                 }
                 _ => {}
                 
