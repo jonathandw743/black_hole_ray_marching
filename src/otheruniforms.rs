@@ -34,7 +34,6 @@ where
 
 pub struct OtherUniform {
     pub label: String,
-    // pub shader_stage: ShaderStages,
     pub inc_value: Box<dyn IncValueTrait>,
 }
 

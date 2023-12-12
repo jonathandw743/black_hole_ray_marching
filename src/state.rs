@@ -3,10 +3,11 @@ use std::fmt::Display;
 use std::iter;
 use std::num::NonZeroU64;
 use wgpu::ShaderStages;
+use winit::dpi::{PhysicalPosition, LogicalPosition};
 // use cgmath::num_traits::float;
 use winit::{event::*, window::Window};
 
-use glam::{vec3, Vec3};
+use glam::{vec3, Vec3, vec2, Vec2};
 
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -36,8 +37,8 @@ use crate::vertices::VERTICES;
 // // mod indices;
 use crate::indices::INDICES;
 
-use crate::uniformscontroller::*;
 use crate::otheruniforms::*;
+use crate::uniformscontroller::*;
 
 use crate::podbool::*;
 
@@ -81,6 +82,9 @@ pub struct State {
     pub start_of_last_frame_instant: Instant,
     pub delta_time: Duration,
     pub should_render: bool,
+
+    pub prev_cursor_position: Option<PhysicalPosition<f64>>,
+    pub cursor_position: Option<PhysicalPosition<f64>>,
     // pub buffer5: encase::UniformBuffer<Vec<u8>>,
 }
 
@@ -229,7 +233,7 @@ impl State {
         );
 
         let data = other_uniforms.uniform_buffer_content();
-        let mut d: [u8; 1284] = unsafe {std::mem::zeroed()};
+        let mut d: [u8; 1284] = unsafe { std::mem::zeroed() };
         for (i, x) in data.iter().enumerate() {
             d[i] = *x;
         }
@@ -333,10 +337,7 @@ impl State {
 
         let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
-            bind_group_layouts: &[
-                &uniform_bind_group_layout,
-                &diffuse_bind_group_layout,
-            ],
+            bind_group_layouts: &[&uniform_bind_group_layout, &diffuse_bind_group_layout],
             push_constant_ranges: &[],
         });
 
@@ -423,9 +424,6 @@ impl State {
             camera_uniform,
             camera_uniform_buffer,
 
-            // camera_uniform_bind_group,
-
-            // uniform_controller_group,
             uniform_bind_group,
 
             other_uniforms,
@@ -436,6 +434,9 @@ impl State {
             start_of_last_frame_instant: last_frame_time,
             delta_time,
             should_render,
+
+            prev_cursor_position: None,
+            cursor_position: None,
         }
     }
 
@@ -453,6 +454,16 @@ impl State {
         }
     }
 
+    fn process_event(&mut self, event: &WindowEvent) -> bool {
+        match event {
+            &WindowEvent::CursorMoved { position, .. } => {
+                self.cursor_position = Some(position);
+                true
+            }
+            _ => false,
+        }
+    }
+
     #[allow(unused_variables)]
     pub fn input(&mut self, event: &WindowEvent) -> bool {
         // allow controllers to process the event
@@ -463,49 +474,40 @@ impl State {
                 0,
                 &self.other_uniforms.uniform_buffer_content(),
             );
-            dbg!(self.other_uniforms.uniform_buffer_content().len());
         }
         [
             self.settings_controller.process_event(event),
             other_uniforms_event_result,
             self.camera_controller.process_event(event),
+            self.process_event(event),
         ]
         .iter()
         .any(|&result| result)
     }
 
     pub fn update(&mut self) {
-        flame::start("update");
         self.delta_time = self.start_of_last_frame_instant.elapsed();
         self.start_of_last_frame_instant += self.delta_time;
         // update controllers
         self.settings_controller.update_settings(&mut self.settings);
-        self.should_render = self.camera_controller.update_camera(&mut self.camera, self.delta_time);
+        self.should_render = self.camera_controller.update_camera(
+            &mut self.camera,
+            self.delta_time,
+            match (self.prev_cursor_position, self.cursor_position) {
+                (Some(prev), Some(curr)) => vec2(curr.x as f32, curr.y as f32) != vec2(prev.x as f32, prev.y as f32),
+                _ => false,
+            },
+        );
         self.should_render = true;
         // camera update camera uniform and buffer
         self.camera_uniform.update(&self.camera);
-
-        flame::start("getting data");
+        
         let data = self.camera_uniform.uniform_buffer_content();
-        let mut d: [u8; 80] = unsafe {std::mem::zeroed()};
-        for (i, x) in data.iter().enumerate() {
-            d[i] = *x;
-        }
-        let stuff_to_send: &[u8] = bytemuck::cast_slice(&d);
-        flame::end("getting data");
-        dbg!(data.len());
-        flame::start("queue");
-        self.queue.write_buffer(
-            &self.camera_uniform_buffer,
-            0,
-            stuff_to_send,
-        );
-        flame::end("queue");
-        flame::end("update");
+        self.queue.write_buffer(&self.camera_uniform_buffer, 0, &data);
+        self.prev_cursor_position = self.cursor_position;
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        flame::start("render");
         if !self.should_render {
             return Ok(());
         }
@@ -543,18 +545,16 @@ impl State {
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
-            
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
             // render_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
 
             render_pass.set_bind_group(1, &self.diffuse_bind_group, &[]);
-            
+
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
         }
 
         self.queue.submit(iter::once(encoder.finish()));
         output.present();
-
 
         Ok(())
     }
