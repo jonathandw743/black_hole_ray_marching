@@ -100,6 +100,59 @@ fn tsw(t_diffuse: texture_2d<f32>, s_difuse: sampler, tex_coords: vec2<f32>) -> 
     return textureSample(t_diffuse, s_diffuse, tex_coords);
 }
 
+struct Photon {
+    ro: vec3<f32>,
+    rd: vec3<f32>,
+}
+
+fn get_delta_photon_rk4(ro: vec3<f32>, rd: vec3<f32>, delta_time: f32, h2: f32) -> Photon {
+    let ro_k1 = delta_time * rd;
+    let rd_k1 = delta_time * rd_derivative(ro, h2);
+    
+    let ro_k2 = delta_time * (rd + 0.5 * rd_k1);
+    let rd_k2 = delta_time * rd_derivative(ro + 0.5 * ro_k1, h2);
+    
+    let ro_k3 = delta_time * (rd + 0.5 * rd_k2);
+    let rd_k3 = delta_time * rd_derivative(ro + 0.5 * ro_k2, h2);
+    
+    let ro_k4 = delta_time * (rd + rd_k3);
+    let rd_k4 = delta_time * rd_derivative(ro + ro_k3, h2);
+
+    let delta_ro = (ro_k1 + 2.0 * ro_k2 + 2.0 * ro_k3 + ro_k4) / 6.0;
+    let delta_rd = (rd_k1 + 2.0 * rd_k2 + 2.0 * rd_k3 + rd_k4) / 6.0;
+
+    return Photon(delta_ro, delta_rd);
+}
+
+fn get_delta_photon_rk3(ro: vec3<f32>, rd: vec3<f32>, delta_time: f32, h2: f32) -> Photon {
+    let ro_k1 = delta_time * rd;
+    let rd_k1 = delta_time * rd_derivative(ro, h2);
+    
+    let ro_k2 = delta_time * (rd + 0.5 * rd_k1);
+    let rd_k2 = delta_time * rd_derivative(ro + 0.5 * ro_k1, h2);
+    
+    let ro_k3 = delta_time * (rd - rd_k1 + 2.0 * rd_k2);
+    let rd_k3 = delta_time * rd_derivative(ro - ro_k1 + 2.0 * ro_k2, h2);
+
+    let delta_ro = (ro_k1 + 4.0 * ro_k2 + ro_k3) / 6.0;
+    let delta_rd = (rd_k1 + 4.0 * rd_k2 + rd_k3) / 6.0;
+
+    return Photon(delta_ro, delta_rd);
+}
+
+fn get_delta_photon_rk2(ro: vec3<f32>, rd: vec3<f32>, delta_time: f32, h2: f32) -> Photon {
+    let ro_k1 = delta_time * rd;
+    let rd_k1 = delta_time * rd_derivative(ro, h2);
+    
+    let ro_k2 = delta_time * (rd + rd_k1);
+    let rd_k2 = delta_time * rd_derivative(ro + ro_k1, h2);
+
+    let delta_ro = (ro_k1 + ro_k2) * 0.5;
+    let delta_rd = (rd_k1 + rd_k2) * 0.5;
+
+    return Photon(delta_ro, delta_rd);
+}
+
 fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
     // let BLACK_HOLE: BlackHole = BlackHole(vec3<f32>(0.0, 0.0, 0.0), BLACK_HOLE_MASS);
     
@@ -130,37 +183,52 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
 
         let dist = min(dist_0, ps_dist);
         
-        let rate_of_change_of_rd = rd_derivative(ro, h2);
+        // let rate_of_change_of_rd = rd_derivative(ro, h2);
 
-        // can interpret dist as a time due to c = 1
-        var delta_time = min(u.MAX_DELTA_TIME, dist * 0.5);
+        // var delta_time = 0.0;
+        // // can interpret dist as a time due to c = 1
+        // if dist < u.MAX_DELTA_TIME {
+        //     delta_time = dist;
+        //     let delta_photon = get_delta_photon(ro, rd, delta_time, h2);
 
-        let ro_k1 = delta_time * rd;
-        let rd_k1 = delta_time * rd_derivative(ro, h2);
-        
-        let ro_k2 = delta_time * (rd + 0.5 * rd_k1);
-        let rd_k2 = delta_time * rd_derivative(ro + 0.5 * ro_k1, h2);
-        
-        let ro_k3 = delta_time * (rd + 0.5 * rd_k2);
-        let rd_k3 = delta_time * rd_derivative(ro + 0.5 * ro_k2, h2);
-        
-        let ro_k4 = delta_time * (rd + rd_k3);
-        let rd_k4 = delta_time * rd_derivative(ro + ro_k3, h2);
+        //     ro += delta_photon.ro;
+        //     rd += delta_photon.rd;
+        // } else {
+        //     delta_time = u.MAX_DELTA_TIME;
+        //     var delta_photon = get_delta_photon(ro, rd, delta_time, h2);
+            
+        //     let sf = 0.0001 / length(delta_photon.rd);
 
-        let delta_ro = (ro_k1 + 2.0 * ro_k2 + 2.0 * ro_k3 + ro_k4) / 6.0;
-        let delta_rd = (rd_k1 + 2.0 * rd_k2 + 2.0 * rd_k3 + rd_k4) / 6.0;
+        //     delta_time = clamp(sf, u.MAX_DELTA_TIME, 1.0);
 
-        ro += delta_ro;
-        rd += delta_rd;
-        
-        ro_rd_cross = cross(ro, rd);
-        h2 = dot(ro_rd_cross, ro_rd_cross);
+        //     if dist < delta_time {
+        //         delta_time = dist;
+        //     }
+                
+        //     delta_photon = get_delta_photon(ro, rd, delta_time, h2);
+
+        //     ro += delta_photon.ro;
+        //     rd += delta_photon.rd;
+
+        //     // return vec3<f32>(sf, sf, sf);
+        // }
+
+        let delta_time = min(dist * 0.9, u.MAX_DELTA_TIME);
+
+
+        let delta_photon = get_delta_photon_rk4(ro, rd, delta_time, h2);
+
+        ro += delta_photon.ro;
+        rd += delta_photon.rd;
 
         distance_travelled += delta_time;
         if distance_travelled > u.MAX_DIST {
             // return vec3<f32>(0.0, 1.0, 1.0);
             break;
         }        
+        
+        ro_rd_cross = cross(ro, rd);
+        h2 = dot(ro_rd_cross, ro_rd_cross);
     }
     // let b = sqrt(dot(ray_origin, ray_origin) + dot(ray_dir, ray_origin) * dot(ray_dir, ray_origin));
     // let lro = length(ray_origin);

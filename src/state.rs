@@ -2,12 +2,12 @@ use std::f32::consts::PI;
 use std::fmt::Display;
 use std::iter;
 use std::num::NonZeroU64;
-use wgpu::{ShaderStages, InstanceFlags};
-use winit::dpi::{PhysicalPosition, LogicalPosition};
+use wgpu::{InstanceFlags, ShaderStages};
+use winit::dpi::{LogicalPosition, PhysicalPosition};
 // use cgmath::num_traits::float;
 use winit::{event::*, window::Window};
 
-use glam::{vec3, Vec3, vec2, Vec2};
+use glam::{vec2, vec3, Vec2, Vec3};
 
 use std::thread::sleep;
 // use std::time::{Duration, Instant};
@@ -101,7 +101,7 @@ impl State {
             backends: wgpu::Backends::all(),
             dx12_shader_compiler: Default::default(),
             flags: InstanceFlags::empty(),
-            gles_minor_version: wgpu::Gles3MinorVersion::Automatic
+            gles_minor_version: wgpu::Gles3MinorVersion::Automatic,
         });
 
         // # Safety
@@ -508,19 +508,19 @@ impl State {
         self.should_render = true;
         // camera update camera uniform and buffer
         self.camera_uniform.update(&self.camera);
-        
+
         let data = self.camera_uniform.uniform_buffer_content();
         self.queue.write_buffer(&self.camera_uniform_buffer, 0, &data);
         self.prev_cursor_position = self.cursor_position;
     }
-    
+
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         if !self.should_render {
             return Ok(());
         }
-        
+
         let render_start = Instant::now();
-        
+
         // the output texture for the render
         // let output = self.surface.get_current_texture()?;
         let output = self.surface.get_current_texture()?;
@@ -531,11 +531,11 @@ impl State {
 
         // a way to access this output texture
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
-        
+
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
-        
+
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
@@ -558,22 +558,21 @@ impl State {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
-            
+
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            
+
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
             // render_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
-            
+
             render_pass.set_bind_group(1, &self.diffuse_bind_group, &[]);
-            
+
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
         }
         self.queue.submit(iter::once(encoder.finish()));
-        
-        
+
         output.present();
-        
+
         self.frame_number += 1;
 
         Ok(())
@@ -582,11 +581,13 @@ impl State {
     pub fn sleep(&mut self) {
         let current_frame_duration = self.start_of_last_frame_instant.elapsed();
         if let Some(max_frame_rate) = self.settings.max_frame_rate {
-            let min_frame_duration = Duration::from_secs_f32(1.0 / max_frame_rate);
             #[cfg(not(target_arch = "wasm32"))] // can't sleep normally in wasm
-            if current_frame_duration < min_frame_duration {
-                let sleep_duration = min_frame_duration - current_frame_duration;
-                sleep(sleep_duration);
+            {
+                let min_frame_duration = Duration::from_secs_f32(1.0 / max_frame_rate);
+                if current_frame_duration < min_frame_duration {
+                    let sleep_duration = min_frame_duration - current_frame_duration;
+                    sleep(sleep_duration);
+                }
             }
         }
     }
