@@ -1,8 +1,5 @@
 use winit::{
-    dpi::PhysicalSize,
     event::*,
-    event_loop::{ControlFlow, EventLoop},
-    window::{Window, WindowBuilder},
 };
 
 pub fn number_from_virtual_key_code(virtual_key_code: &VirtualKeyCode) -> Option<usize> {

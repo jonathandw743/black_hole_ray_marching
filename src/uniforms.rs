@@ -2,16 +2,10 @@
 use wgpu::util::DeviceExt;
 use winit::{
     dpi::PhysicalSize,
-    event::*,
-    event_loop::{ControlFlow, EventLoop},
-    window::{Window, WindowBuilder},
 };
 
 use glam::{
-    Vec2,
-    Vec3,
-    Vec4,
-    vec2, vec3, vec4, Mat4,
+    Vec3, Mat4,
 };
 
 
@@ -19,7 +13,7 @@ use encase::{
     ShaderType,
 };
 
-use aligned::{Aligned, A16};
+
 
 use crate::camera::Camera;
 

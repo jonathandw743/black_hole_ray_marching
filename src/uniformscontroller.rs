@@ -1,17 +1,17 @@
-use std::fmt::Debug;
-use std::iter;
-use std::marker::PhantomData;
-use std::num::NonZeroU64;
-use std::ops::{Add, Sub};
 
-use encase::internal::{WriteInto, Writer};
-use encase::{DynamicUniformBuffer, ShaderType, UniformBuffer};
+
+
+
+
+
+
+
 // use cgmath::num_traits::float;
-use wgpu::{Queue, ShaderStages};
-use winit::{event::*, window::Window};
 
-use std::thread::sleep;
-use std::time::{Duration, Instant};
+use winit::{event::*};
+
+
+
 
 use wgpu::util::DeviceExt;
 
@@ -19,24 +19,24 @@ use wgpu::util::DeviceExt;
 use wasm_bindgen::prelude::*;
 
 // mod texture;
-use crate::texture::Texture;
+
 
 // mod settings;
-use crate::settings::{number_from_virtual_key_code, Settings, SettingsController};
+use crate::settings::{number_from_virtual_key_code};
 
-use crate::uniforms::{CameraPosUniform, CameraViewProjUniform, OpticalDensityUniform};
+
 
 // mod camera;
-use crate::camera::{Camera, CameraController};
+
 
 // mod vertex;
-use crate::vertex::Vertex;
+
 
 // mod vertices;
-use crate::vertices::VERTICES;
+
 
 // // mod indices;
-use crate::indices::INDICES;
+
 
 pub struct UniformAndBuffer<UniformType>
 where

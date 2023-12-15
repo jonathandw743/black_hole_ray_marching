@@ -1,13 +1,13 @@
 use std::f32::consts::PI;
-use std::fmt::Display;
+
 use std::iter;
-use std::num::NonZeroU64;
-use wgpu::{InstanceFlags, ShaderStages};
-use winit::dpi::{LogicalPosition, PhysicalPosition};
+
+use wgpu::{InstanceFlags};
+use winit::dpi::{PhysicalPosition};
 // use cgmath::num_traits::float;
 use winit::{event::*, window::Window};
 
-use glam::{vec2, vec3, Vec2, Vec3};
+use glam::{vec2, Vec3};
 
 use std::thread::sleep;
 // use std::time::{Duration, Instant};
@@ -22,9 +22,9 @@ use wasm_bindgen::prelude::*;
 use crate::texture::Texture;
 
 // mod settings;
-use crate::settings::{number_from_virtual_key_code, Settings, SettingsController};
+use crate::settings::{Settings, SettingsController};
 
-use crate::uniforms::{CameraPosUniform, CameraUniform, CameraViewProjUniform, OpticalDensityUniform};
+use crate::uniforms::{CameraUniform};
 
 // mod camera;
 use crate::camera::{Camera, CameraController};

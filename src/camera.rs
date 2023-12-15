@@ -6,7 +6,7 @@ use winit::{dpi::PhysicalPosition, event::*};
 
 // use cgmath::{Quaternion, Rad};
 
-use glam::{mat4, vec2, vec3, vec4, Mat4, Quat, Vec2, Vec3, Vec4};
+use glam::{mat4, vec2, vec4, Mat4, Quat, Vec2, Vec3};
 
 pub struct Camera {
     pub pos: Vec3,
@@ -210,7 +210,7 @@ impl CameraController {
             (true, false) => -1.0,
             (true, true) => 0.0,
         };
-        let z_movement = dt * self.speed * z_movement_norm;
+        let _z_movement = dt * self.speed * z_movement_norm;
 
         let y_movement_norm = match (self.is_down_pressed, self.is_up_pressed) {
             (false, false) => 0.0,

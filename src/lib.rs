@@ -27,8 +27,8 @@ mod vertices;
 mod state;
 use state::State;
 
-use std::fs::File;
-use std::time::{Duration, Instant};
+
+
 
 
 pub fn create_window() -> (Window, EventLoop<()>) {

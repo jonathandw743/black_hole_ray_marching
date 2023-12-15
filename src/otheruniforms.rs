@@ -1,12 +1,12 @@
 use std::num::NonZeroU64;
 
-use encase::{ShaderType, ShaderSize, internal::{WriteInto, Writer, SizeValue}};
+use encase::{ShaderType, internal::{WriteInto, Writer}};
 use crate::uniformscontroller::{Increment, Opposite};
 use winit::event::{WindowEvent, VirtualKeyCode, ElementState, KeyboardInput};
-use encase::CalculateSizeFor;
+
 use crate::settings::number_from_virtual_key_code;
-use encase::{DynamicUniformBuffer, UniformBuffer};
-use encase::*;
+
+
 
 // mental gymnastics begins
 
@@ -107,7 +107,7 @@ impl<const N: usize> OtherUniforms<N> {
                 pos += other_uniform.inc_value.size().get() as usize;
             }
         }
-        for i in (buffer.len()..((buffer.len() as f32 / 16.0).ceil() * 16.0) as usize) {
+        for _i in buffer.len()..((buffer.len() as f32 / 16.0).ceil() * 16.0) as usize {
             buffer.push(0u8);
         }
         buffer
