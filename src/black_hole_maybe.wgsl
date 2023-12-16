@@ -74,7 +74,7 @@ fn sdf_accretion_disk(p: vec3<f32>, centre: vec3<f32>, big_r: f32, little_r: f32
 fn get_dist(p: vec3<f32>) -> f32 {
     // let sd_sphere_bh = sdf_sphere(p, vec3<f32>(0.0, 0.0, 0.0), 0.8);
 
-    let sd_accretion_disk = sdf_accretion_disk(p, vec3<f32>(0.0), 5.0 * u.RS, 3.0 * u.RS);
+    let sd_accretion_disk = sdf_accretion_disk(p, vec3<f32>(0.0), 6.0 * u.RS, 3.0 * u.RS);
 
     // return min(sd_sphere_bh, sd_accretion_disk);
     return sd_accretion_disk;
@@ -213,22 +213,27 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
         //     // return vec3<f32>(sf, sf, sf);
         // }
 
-        let delta_time = min(dist * 0.9, u.MAX_DELTA_TIME);
+        // let delta_time = min(dist * 0.9, u.MAX_DELTA_TIME);
 
+        let rd_der = rd_derivative(ro, h2);
 
-        let delta_photon = get_delta_photon_rk4(ro, rd, delta_time, h2);
+        let dd = min(dist * 0.9, u.MAX_DELTA_TIME / max(pow(dot(rd_der, rd_der), 0.25), 0.05));
+
+        let delta_photon = get_delta_photon_rk4(ro, rd, dd, h2);
+
+        //todo this could need changing
+        if u32_to_bool(u.BLACKOUT_EH) && dot(ro, ro + delta_photon.ro) < 0.0 {
+            return vec3<f32>(0.0);
+        }
 
         ro += delta_photon.ro;
         rd += delta_photon.rd;
 
-        distance_travelled += delta_time;
+        distance_travelled += dd;
         if distance_travelled > u.MAX_DIST {
             // return vec3<f32>(0.0, 1.0, 1.0);
             break;
-        }        
-        
-        ro_rd_cross = cross(ro, rd);
-        h2 = dot(ro_rd_cross, ro_rd_cross);
+        }
     }
     // let b = sqrt(dot(ray_origin, ray_origin) + dot(ray_dir, ray_origin) * dot(ray_dir, ray_origin));
     // let lro = length(ray_origin);

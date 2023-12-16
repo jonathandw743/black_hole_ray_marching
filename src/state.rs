@@ -228,7 +228,7 @@ impl State {
                 },
                 OtherUniform {
                     label: "max view distance".into(),
-                    inc_value: Box::new(IncValue { value: 30.0, inc: 1.0 }),
+                    inc_value: Box::new(IncValue { value: 50.0, inc: 1.0 }),
                 },
                 OtherUniform {
                     label: "distortion power".into(),
