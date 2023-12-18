@@ -33,7 +33,7 @@ use crate::camera::{Camera, CameraController};
 use crate::vertex::Vertex;
 
 // mod vertices;
-use crate::vertices::VERTICES;
+use crate::vertices::{POSTPROCESSING_VERTICES, VERTICES};
 
 // // mod indices;
 use crate::indices::INDICES;
@@ -51,7 +51,7 @@ pub struct State {
     pub config: wgpu::SurfaceConfiguration,
     pub size: winit::dpi::PhysicalSize<u32>,
     pub window: Window,
-    pub render_pipeline: wgpu::RenderPipeline,
+    pub scene_pipeline: wgpu::RenderPipeline,
 
     // vertices and indices
     pub vertex_buffer: wgpu::Buffer,
@@ -88,6 +88,12 @@ pub struct State {
     pub cursor_position: Option<PhysicalPosition<f64>>,
 
     pub frame_number: u32,
+
+    pub postprocessing_pipeline: wgpu::RenderPipeline,
+    pub postprocessing_vertex_buffer: wgpu::Buffer,
+    pub num_postprocessing_vertices: u32,
+    pub postprocessing_input_bind_group: wgpu::BindGroup,
+    pub scene_texture: wgpu::Texture,
     // pub buffer5: encase::UniformBuffer<Vec<u8>>,
 }
 
@@ -295,7 +301,7 @@ impl State {
         // diffuse texture stuff
 
         surface.configure(&device, &config);
-        surface.configure(&device, &config);
+        // surface.configure(&device, &config);
         let diffuse_bytes = background_image;
         let diffuse_texture = Texture::from_bytes(&device, &queue, diffuse_bytes, "space").unwrap();
 
@@ -338,17 +344,17 @@ impl State {
             label: Some("diffuse_bind_group"),
         });
 
-        // render pipeline
+        // scene pipeline
 
-        let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Render Pipeline Layout"),
+        let scene_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("scene Pipeline Layout"),
             bind_group_layouts: &[&uniform_bind_group_layout, &diffuse_bind_group_layout],
             push_constant_ranges: &[],
         });
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
-            layout: Some(&render_pipeline_layout),
+        let scene_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("scene Pipeline"),
+            layout: Some(&scene_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main", // 1.
@@ -410,6 +416,138 @@ impl State {
 
         let should_render = true;
 
+
+
+
+        //////////////////////////////////////////////////////////
+         
+         
+         
+         
+        
+
+
+        let postprocessing_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(POSTPROCESSING_VERTICES),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        let num_postprocessing_vertices = POSTPROCESSING_VERTICES.len() as u32;
+
+        let scene_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Scene Texture"),
+            size: wgpu::Extent3d {
+                width: config.width,
+                height: config.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+
+        let postprocessing_input_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        // This should match the filterable field of the
+                        // corresponding Texture entry above.
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+                label: Some("postprocessing_input_bind_group_layout"),
+            });
+        let postprocessing_input_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &postprocessing_input_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(
+                        &scene_texture.create_view(&wgpu::TextureViewDescriptor::default()),
+                    ), // CHANGED!
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&device.create_sampler(&wgpu::SamplerDescriptor {
+                        address_mode_u: wgpu::AddressMode::ClampToEdge,
+                        address_mode_v: wgpu::AddressMode::ClampToEdge,
+                        address_mode_w: wgpu::AddressMode::ClampToEdge,
+                        mag_filter: wgpu::FilterMode::Nearest,
+                        min_filter: wgpu::FilterMode::Nearest,
+                        mipmap_filter: wgpu::FilterMode::Nearest,
+                        ..Default::default()
+                    })), // CHANGED!
+                },
+            ],
+            label: Some("postprocessing_input_bind_group"),
+        });
+
+        let postprocessing_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("postprocessing shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("./postprocessing.wgsl").into()),
+            // source: wgpu::ShaderSource::Wgsl(include_str!("../../shaders/raymarching.wgsl").into()),
+        });
+        let postprocessing_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("postprocessing Pipeline Layout"),
+            bind_group_layouts: &[&postprocessing_input_bind_group_layout],
+            push_constant_ranges: &[],
+        });
+        let postprocessing_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("postprocessing Pipeline"),
+            layout: Some(&postprocessing_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &postprocessing_shader,
+                entry_point: "vs_main", // 1.
+                buffers: &[Vertex::desc()],
+            },
+            fragment: Some(wgpu::FragmentState {
+                // 3.
+                module: &postprocessing_shader,
+                entry_point: "fs_main",
+                targets: &[Some(wgpu::ColorTargetState {
+                    // 4.
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList, // 1.
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw, // 2.
+                cull_mode: Some(wgpu::Face::Back),
+                // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
+                polygon_mode: wgpu::PolygonMode::Fill,
+                // Requires Features::DEPTH_CLIP_CONTROL
+                unclipped_depth: false,
+                // Requires Features::CONSERVATIVE_RASTERIZATION
+                conservative: false,
+            },
+            depth_stencil: None, // 1.
+            multisample: wgpu::MultisampleState {
+                count: 1,                         // 2.
+                mask: !0,                         // 3.
+                alpha_to_coverage_enabled: false, // 4.
+            },
+            multiview: None, // 5.
+        });
+
         Self {
             surface,
             device,
@@ -417,7 +555,7 @@ impl State {
             config,
             size,
             window,
-            render_pipeline,
+            scene_pipeline,
             vertex_buffer,
             index_buffer,
             num_indices,
@@ -444,6 +582,12 @@ impl State {
             cursor_position: None,
 
             frame_number: 0,
+
+            postprocessing_pipeline,
+            postprocessing_vertex_buffer,
+            num_postprocessing_vertices,
+            postprocessing_input_bind_group,
+            scene_texture,
         }
     }
 
@@ -521,32 +665,22 @@ impl State {
 
         let render_start = Instant::now();
 
-        // the output texture for the render
-        // let output = self.surface.get_current_texture()?;
-        let output = self.surface.get_current_texture()?;
-        let render_time = Instant::now() - render_start;
-        if self.frame_number % 100 == 0 {
-            dbg!(render_time);
-        }
-
-        // a way to access this output texture
-        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
-
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Render Encoder"),
+            label: Some("scene Render Encoder"),
         });
 
+        let scene_view = self.scene_texture.create_view(&wgpu::TextureViewDescriptor::default());
         {
             let mut scene_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Scene Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
+                    view: &scene_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
+                            r: 1.0,
                             g: 0.2,
-                            b: 0.3,
+                            b: 0.0,
                             a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
@@ -557,7 +691,7 @@ impl State {
                 occlusion_query_set: None,
             });
 
-            scene_pass.set_pipeline(&self.render_pipeline);
+            scene_pass.set_pipeline(&self.scene_pipeline);
 
             scene_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             scene_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
@@ -569,14 +703,60 @@ impl State {
 
             scene_pass.draw_indexed(0..self.num_indices, 0, 0..1);
         }
+
         self.queue.submit(iter::once(encoder.finish()));
 
-        if self.frame_number == 0 {
-            save_texture_as_image(&self.device, &self.queue, &output.texture, "output.png");
+        //update the postprocessing input
+
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("postprocessing render Encoder"),
+        });
+
+        // the output texture for the render
+        // let output = self.surface.get_current_texture()?;
+        let output = self.surface.get_current_texture()?;
+
+        // a way to access this output texture
+        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        {
+            let mut postprocessing_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Scene Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.1,
+                            g: 0.2,
+                            b: 0.8,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+
+            postprocessing_pass.set_pipeline(&self.postprocessing_pipeline);
+
+            postprocessing_pass.set_vertex_buffer(0, self.postprocessing_vertex_buffer.slice(..));
+
+            postprocessing_pass.set_bind_group(0, &self.postprocessing_input_bind_group, &[]);
+
+            postprocessing_pass.draw(0..self.num_postprocessing_vertices, 0..1);
         }
+
+        self.queue.submit(iter::once(encoder.finish()));
 
         output.present();
 
+        let render_time = Instant::now() - render_start;
+        if self.frame_number % 100 == 0 {
+            dbg!(render_time);
+        }
 
         self.frame_number += 1;
 
