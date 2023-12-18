@@ -173,12 +173,12 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
 
         let dist_0 = get_dist(ro);
         if dist_0 < MIN_DIST {
-            return vec3<f32>(1.0);
+            return vec3<f32>(10.0);
         }
 
         let ps_dist = sdf_sphere(ro, -normalize(ray_origin) * 1.5 * u.RS, 0.075);
         if ps_dist < MIN_DIST {
-            return vec3<f32>(1.0, 1.0, 0.0);
+            return vec3<f32>(5.0, 5.0, 0.0);
         }
 
         let dist = min(dist_0, ps_dist);
@@ -248,10 +248,20 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
     // return rd * BG_BRIGHTNESS;
 }
 
+fn map_col_component(component: f32) -> f32 {
+    // return 1.0 - exp(-component);
+    return 1.0 - 1.0 / (component + 1.0);
+}
+
+fn map_col(col: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(map_col_component(col.x), map_col_component(col.y), map_col_component(col.z));
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let ray_dir = normalize(in.camera_to_vertex);
     let col = get_col(camera.pos.xyz, ray_dir);
+    // let mapped_col = map_col(col);
     return vec4<f32>(col, 1.0);
 }
 

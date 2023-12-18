@@ -2,8 +2,8 @@ use std::f32::consts::PI;
 
 use std::iter;
 
-use wgpu::{InstanceFlags};
-use winit::dpi::{PhysicalPosition};
+use wgpu::InstanceFlags;
+use winit::dpi::PhysicalPosition;
 // use cgmath::num_traits::float;
 use winit::{event::*, window::Window};
 
@@ -24,7 +24,7 @@ use crate::texture::Texture;
 // mod settings;
 use crate::settings::{Settings, SettingsController};
 
-use crate::uniforms::{CameraUniform};
+use crate::uniforms::CameraUniform;
 
 // mod camera;
 use crate::camera::{Camera, CameraController};
@@ -537,8 +537,8 @@ impl State {
         });
 
         {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
+            let mut scene_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Scene Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
@@ -557,21 +557,26 @@ impl State {
                 occlusion_query_set: None,
             });
 
-            render_pass.set_pipeline(&self.render_pipeline);
+            scene_pass.set_pipeline(&self.render_pipeline);
 
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            scene_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            scene_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
-            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            scene_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
             // render_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
 
-            render_pass.set_bind_group(1, &self.diffuse_bind_group, &[]);
+            scene_pass.set_bind_group(1, &self.diffuse_bind_group, &[]);
 
-            render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+            scene_pass.draw_indexed(0..self.num_indices, 0, 0..1);
         }
         self.queue.submit(iter::once(encoder.finish()));
 
+        if self.frame_number == 0 {
+            save_texture_as_image(&self.device, &self.queue, &output.texture, "output.png");
+        }
+
         output.present();
+
 
         self.frame_number += 1;
 
@@ -591,4 +596,54 @@ impl State {
             }
         }
     }
+}
+
+fn save_texture_as_image(device: &wgpu::Device, queue: &wgpu::Queue, texture: &wgpu::Texture, path: &str) {
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("Read Texture Encoder"),
+    });
+    encoder.copy_texture_to_buffer(
+        wgpu::ImageCopyTexture {
+            texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::ImageCopyBuffer {
+            buffer: &device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Texture Buffer"),
+                size: (4 * texture.size().width * texture.size().height) as wgpu::BufferAddress,
+                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
+                mapped_at_creation: false,
+            }),
+            layout: wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * texture.size().width),
+                rows_per_image: Some(texture.size().height),
+            },
+        },
+        texture.size(),
+    );
+    // Ensure the texture is ready for reading
+    queue.submit(iter::once(encoder.finish()));
+
+    let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Read Texture Buffer"),
+        size: (4 * texture.size().width * texture.size().height) as wgpu::BufferAddress,
+        usage: wgpu::BufferUsages::COPY_SRC,
+        mapped_at_creation: false,
+    });
+
+    // Map the buffer for reading
+    let buffer_slice = buffer.slice(..);
+
+    let buffer_view = buffer_slice.get_mapped_range();
+    let image = image::DynamicImage::ImageRgba8(
+        image::RgbaImage::from_raw(texture.size().width, texture.size().height, buffer_view.to_vec()).unwrap(),
+    );
+
+    // Save the image to a file
+    image.save(path).expect("Failed to save image file");
+
+    device.poll(wgpu::Maintain::Wait);
 }

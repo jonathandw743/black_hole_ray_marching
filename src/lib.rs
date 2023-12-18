@@ -3,7 +3,7 @@ use winit::{
     dpi::PhysicalSize,
     event::*,
     event_loop::{ControlFlow, EventLoop},
-    window::{Window, WindowBuilder},
+    window::{Window, WindowBuilder}, monitor::{VideoMode, MonitorHandle},
 };
 
 #[cfg(target_arch = "wasm32")]
@@ -45,6 +45,7 @@ pub fn create_window() -> (Window, EventLoop<()>) {
     let window = WindowBuilder::new().build(&event_loop).unwrap();
     window.set_inner_size(PhysicalSize::new(1000, 800));
     window.set_cursor_visible(true);
+    // window.set_fullscreen(Some(winit::window::Fullscreen::Borderless(None)));
 
     #[cfg(target_arch = "wasm32")]
     {
