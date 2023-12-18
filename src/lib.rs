@@ -127,6 +127,10 @@ pub async fn run() {
                 }
                 state.update();
                 state.sleep();
+
+                if state.frame_number == 5 {
+                    *control_flow = ControlFlow::Exit
+                }
             }
             Event::RedrawEventsCleared => {
                 // RedrawRequested will only trigger once, unless we manually

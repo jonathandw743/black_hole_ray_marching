@@ -665,11 +665,14 @@ impl State {
 
         let render_start = Instant::now();
 
+        flame::start("render");
+
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("scene Render Encoder"),
         });
 
         let scene_view = self.scene_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        flame::start("scene pass");
         {
             let mut scene_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Scene Pass"),
@@ -703,8 +706,11 @@ impl State {
 
             scene_pass.draw_indexed(0..self.num_indices, 0, 0..1);
         }
+        flame::end("scene pass");
 
+        flame::start("scene queue submit");
         self.queue.submit(iter::once(encoder.finish()));
+        flame::end("scene queue submit");
 
         //update the postprocessing input
 
@@ -712,13 +718,16 @@ impl State {
             label: Some("postprocessing render Encoder"),
         });
 
+        flame::start("get current texture on surface");
         // the output texture for the render
         // let output = self.surface.get_current_texture()?;
         let output = self.surface.get_current_texture()?;
+        flame::end("get current texture on surface");
 
         // a way to access this output texture
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
+        flame::start("postprocessing pass");
         {
             let mut postprocessing_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Scene Pass"),
@@ -748,10 +757,18 @@ impl State {
 
             postprocessing_pass.draw(0..self.num_postprocessing_vertices, 0..1);
         }
+        flame::end("postprocessing pass");
+        flame::start("pp queue submit");
 
         self.queue.submit(iter::once(encoder.finish()));
+        flame::end("pp queue submit");
 
+        flame::start("output present");
         output.present();
+
+        flame::end("output present");
+
+        flame::end("render");
 
         let render_time = Instant::now() - render_start;
         if self.frame_number % 100 == 0 {

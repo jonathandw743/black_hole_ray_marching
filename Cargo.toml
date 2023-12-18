@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 #idk, take this out for building to wasm because thread-id doesn't have a get_internal for the wasm architecture
-# flame = "0.2.2"
+flame = "0.2.2"
 
 winit = "0.27"
 env_logger = "0.10"
