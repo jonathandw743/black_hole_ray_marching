@@ -23,6 +23,8 @@ mod uniforms;
 mod uniformscontroller;
 mod vertex;
 mod vertices;
+mod scene;
+mod blur;
 
 mod state;
 use state::State;
@@ -73,17 +75,8 @@ pub fn create_window() -> (Window, EventLoop<()>) {
 pub async fn run() {
     let (window, event_loop) = create_window();
 
-    // the browser can't handle the width-4096 bg image
-    cfg_if! {
-        if #[cfg(target_arch = "wasm32")] {
-            let background_image = include_bytes!("space-browser.jpg");
-        } else {
-            let background_image = include_bytes!("space.jpg");
-        }
-    }
-
     // State::new uses async code, so we're going to wait for it to finish
-    let mut state = State::new(window, background_image).await;
+    let mut state = State::new(window).await;
 
     event_loop.run(move |event, _, control_flow| {
         match event {

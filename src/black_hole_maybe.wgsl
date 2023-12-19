@@ -261,8 +261,8 @@ fn map_col(col: vec3<f32>) -> vec3<f32> {
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let ray_dir = normalize(in.camera_to_vertex);
     let col = get_col(camera.pos.xyz, ray_dir);
-    // let mapped_col = map_col(col);
-    return vec4<f32>(col, 1.0);
+    let mapped_col = map_col(col);
+    return vec4<f32>(mapped_col, 1.0);
 }
 
 
