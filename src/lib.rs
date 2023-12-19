@@ -128,9 +128,9 @@ pub async fn run() {
                 state.update();
                 state.sleep();
 
-                if state.frame_number == 5 {
-                    *control_flow = ControlFlow::Exit
-                }
+                // if state.frame_number == 5 {
+                //     *control_flow = ControlFlow::Exit;
+                // }
             }
             Event::RedrawEventsCleared => {
                 // RedrawRequested will only trigger once, unless we manually
@@ -139,7 +139,7 @@ pub async fn run() {
             }
             Event::LoopDestroyed => {
                 // println!("hello ended");
-                // flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
+                flame::dump_html(&mut std::fs::File::create("flame-graph.html").unwrap()).unwrap();
             }
             _ => {}
         }

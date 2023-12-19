@@ -30,7 +30,7 @@ use crate::uniforms::CameraUniform;
 use crate::camera::{Camera, CameraController};
 
 // mod vertex;
-use crate::vertex::Vertex;
+use crate::vertex::{Vertex, PostProcessingVertex};
 
 // mod vertices;
 use crate::vertices::{POSTPROCESSING_VERTICES, VERTICES};
@@ -501,7 +501,6 @@ impl State {
         let postprocessing_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("postprocessing shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("./postprocessing.wgsl").into()),
-            // source: wgpu::ShaderSource::Wgsl(include_str!("../../shaders/raymarching.wgsl").into()),
         });
         let postprocessing_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("postprocessing Pipeline Layout"),
@@ -514,7 +513,7 @@ impl State {
             vertex: wgpu::VertexState {
                 module: &postprocessing_shader,
                 entry_point: "vs_main", // 1.
-                buffers: &[Vertex::desc()],
+                buffers: &[PostProcessingVertex::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 // 3.
@@ -652,27 +651,32 @@ impl State {
         self.should_render = true;
         // camera update camera uniform and buffer
         self.camera_uniform.update(&self.camera);
-
+        
         let data = self.camera_uniform.uniform_buffer_content();
         self.queue.write_buffer(&self.camera_uniform_buffer, 0, &data);
         self.prev_cursor_position = self.cursor_position;
     }
-
+    
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         if !self.should_render {
             return Ok(());
         }
-
+        
         let render_start = Instant::now();
-
-        flame::start("render");
-
+        
+        // flame::start("render");
+        
+        
+        let scene_view = self.scene_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        
+        let output = self.surface.get_current_texture()?;
+        let output_view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("scene Render Encoder"),
         });
-
-        let scene_view = self.scene_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        flame::start("scene pass");
+        
+        // flame::start("scene pass");
         {
             let mut scene_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Scene Pass"),
@@ -693,49 +697,36 @@ impl State {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-
+            
             scene_pass.set_pipeline(&self.scene_pipeline);
-
+            
             scene_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             scene_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-
+            
             scene_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
             // render_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
-
+            
             scene_pass.set_bind_group(1, &self.diffuse_bind_group, &[]);
-
+            
             scene_pass.draw_indexed(0..self.num_indices, 0, 0..1);
         }
-        flame::end("scene pass");
+        // flame::end("scene pass");
+        
+        // flame::start("get current texture on surface");
 
-        flame::start("scene queue submit");
-        self.queue.submit(iter::once(encoder.finish()));
-        flame::end("scene queue submit");
+        // flame::start("postprocessing pass");
 
-        //update the postprocessing input
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("postprocessing render Encoder"),
-        });
 
-        flame::start("get current texture on surface");
-        // the output texture for the render
-        // let output = self.surface.get_current_texture()?;
-        let output = self.surface.get_current_texture()?;
-        flame::end("get current texture on surface");
 
-        // a way to access this output texture
-        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        flame::start("postprocessing pass");
         {
-            let mut postprocessing_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Scene Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                let mut postprocessing_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("Scene Pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &output_view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                        load: wgpu::LoadOp::Clear(wgpu::Color {
                             r: 0.1,
                             g: 0.2,
                             b: 0.8,
@@ -748,38 +739,43 @@ impl State {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-
+        
             postprocessing_pass.set_pipeline(&self.postprocessing_pipeline);
-
+        
             postprocessing_pass.set_vertex_buffer(0, self.postprocessing_vertex_buffer.slice(..));
-
+        
             postprocessing_pass.set_bind_group(0, &self.postprocessing_input_bind_group, &[]);
-
+        
             postprocessing_pass.draw(0..self.num_postprocessing_vertices, 0..1);
         }
-        flame::end("postprocessing pass");
-        flame::start("pp queue submit");
 
+
+
+
+
+        // flame::end("postprocessing pass");
+        // flame::start("pp queue submit");
+        
         self.queue.submit(iter::once(encoder.finish()));
-        flame::end("pp queue submit");
-
-        flame::start("output present");
+        // flame::end("pp queue submit");
+        
+        // flame::start("output present");
         output.present();
-
-        flame::end("output present");
-
-        flame::end("render");
-
+        
+        // flame::end("output present");
+        
+        // flame::end("render");
+        
         let render_time = Instant::now() - render_start;
         if self.frame_number % 100 == 0 {
             dbg!(render_time);
         }
-
+        
         self.frame_number += 1;
-
+        
         Ok(())
     }
-
+    
     pub fn sleep(&mut self) {
         let current_frame_duration = self.start_of_last_frame_instant.elapsed();
         if let Some(max_frame_rate) = self.settings.max_frame_rate {
