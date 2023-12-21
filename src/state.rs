@@ -45,6 +45,8 @@ use crate::podbool::*;
 
 use crate::scene::Scene;
 
+use crate::blur::Blur;
+
 pub struct State {
     // wgpu and winit setup
     pub surface: wgpu::Surface,
@@ -58,6 +60,7 @@ pub struct State {
     pub settings_controller: SettingsController,
 
     pub scene: Scene,
+    pub blur: Blur,
 
     // timing
     pub start_of_last_frame_instant: Instant,
@@ -68,12 +71,13 @@ pub struct State {
 
     pub frame_number: u32,
 
-    pub postprocessing_pipeline: wgpu::RenderPipeline,
-    pub postprocessing_vertex_buffer: wgpu::Buffer,
-    pub num_postprocessing_vertices: u32,
-    pub postprocessing_input_bind_group: wgpu::BindGroup,
-    pub scene_texture: wgpu::Texture,
+    // pub postprocessing_pipeline: wgpu::RenderPipeline,
+    // pub postprocessing_vertex_buffer: wgpu::Buffer,
+    // pub num_postprocessing_vertices: u32,
+    // pub postprocessing_input_bind_group: wgpu::BindGroup,
+    // pub scene_texture: wgpu::Texture,
     // pub buffer5: encase::UniformBuffer<Vec<u8>>,
+    // pub i_t: wgpu::Texture,
 }
 
 impl State {
@@ -151,7 +155,17 @@ impl State {
 
         surface.configure(&device, &config);
 
-        let scene: Scene = Scene::new(&device, &queue, &config);
+        let scene = Scene::new(&device, &queue, &config);
+        
+        // let (scene_texture, postprocessing_input_bind_group_layout, postprocessing_input_bind_group) =
+        //     Self::create_scene_texture(&device, &config);
+        
+        let blur = Blur::new(
+            &device,
+            &queue,
+            &config,
+            &scene.output_texture_view,
+        );
 
         // time stuff
 
@@ -159,68 +173,104 @@ impl State {
 
         let delta_time = Duration::from_secs_f32(0.0);
 
+        // let i_t = device.create_texture(&wgpu::TextureDescriptor {
+        //     label: Some("i_t"),
+        //     size: wgpu::Extent3d {
+        //         width: config.width,
+        //         height: config.height,
+        //         depth_or_array_layers: 1,
+        //     },
+        //     mip_level_count: 1,
+        //     sample_count: 1,
+        //     dimension: wgpu::TextureDimension::D2,
+        //     format: wgpu::TextureFormat::Bgra8UnormSrgb,
+        //     usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC,
+        //     view_formats: &[],
+        // });
 
         //////////////////////////////////////////////////////////
 
-        let postprocessing_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(POSTPROCESSING_VERTICES),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        let num_postprocessing_vertices = POSTPROCESSING_VERTICES.len() as u32;
+        // let postprocessing_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        //     label: Some("Vertex Buffer"),
+        //     contents: bytemuck::cast_slice(POSTPROCESSING_VERTICES),
+        //     usage: wgpu::BufferUsages::VERTEX,
+        // });
+        // let num_postprocessing_vertices = POSTPROCESSING_VERTICES.len() as u32;
 
-        let postprocessing_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("postprocessing shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("./postprocessing.wgsl").into()),
-        });
+        // let postprocessing_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        //     label: Some("postprocessing shader"),
+        //     source: wgpu::ShaderSource::Wgsl(include_str!("./postprocessing.wgsl").into()),
+        // });
 
-        let (scene_texture, postprocessing_input_bind_group_layout, postprocessing_input_bind_group) =
-            Self::create_scene_texture(&device, &config);
 
-        let postprocessing_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("postprocessing Pipeline Layout"),
-            bind_group_layouts: &[&postprocessing_input_bind_group_layout],
-            push_constant_ranges: &[],
-        });
-        let postprocessing_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("postprocessing Pipeline"),
-            layout: Some(&postprocessing_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &postprocessing_shader,
-                entry_point: "vs_main", // 1.
-                buffers: &[PostProcessingVertex::desc()],
-            },
-            fragment: Some(wgpu::FragmentState {
-                // 3.
-                module: &postprocessing_shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    // 4.
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList, // 1.
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw, // 2.
-                cull_mode: Some(wgpu::Face::Back),
-                // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
-                polygon_mode: wgpu::PolygonMode::Fill,
-                // Requires Features::DEPTH_CLIP_CONTROL
-                unclipped_depth: false,
-                // Requires Features::CONSERVATIVE_RASTERIZATION
-                conservative: false,
-            },
-            depth_stencil: None, // 1.
-            multisample: wgpu::MultisampleState {
-                count: 1,                         // 2.
-                mask: !0,                         // 3.
-                alpha_to_coverage_enabled: false, // 4.
-            },
-            multiview: None, // 5.
-        });
+        // let postprocessing_input_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        //     layout: &postprocessing_input_bind_group_layout,
+        //     entries: &[
+        //         wgpu::BindGroupEntry {
+        //             binding: 0,
+        //             resource: wgpu::BindingResource::TextureView(
+        //                 &i_t.create_view(&wgpu::TextureViewDescriptor::default()),
+        //             ), // CHANGED!
+        //         },
+        //         wgpu::BindGroupEntry {
+        //             binding: 1,
+        //             resource: wgpu::BindingResource::Sampler(&device.create_sampler(&wgpu::SamplerDescriptor {
+        //                 address_mode_u: wgpu::AddressMode::ClampToEdge,
+        //                 address_mode_v: wgpu::AddressMode::ClampToEdge,
+        //                 address_mode_w: wgpu::AddressMode::ClampToEdge,
+        //                 mag_filter: wgpu::FilterMode::Nearest,
+        //                 min_filter: wgpu::FilterMode::Nearest,
+        //                 mipmap_filter: wgpu::FilterMode::Nearest,
+        //                 ..Default::default()
+        //             })), // CHANGED!
+        //         },
+        //     ],
+        //     label: Some("postprocessing_input_bind_group"),
+        // });
+        // let postprocessing_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        //     label: Some("postprocessing Pipeline Layout"),
+        //     bind_group_layouts: &[&postprocessing_input_bind_group_layout],
+        //     push_constant_ranges: &[],
+        // });
+        // let postprocessing_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        //     label: Some("postprocessing Pipeline"),
+        //     layout: Some(&postprocessing_pipeline_layout),
+        //     vertex: wgpu::VertexState {
+        //         module: &postprocessing_shader,
+        //         entry_point: "vs_main", // 1.
+        //         buffers: &[PostProcessingVertex::desc()],
+        //     },
+        //     fragment: Some(wgpu::FragmentState {
+        //         // 3.
+        //         module: &postprocessing_shader,
+        //         entry_point: "fs_main",
+        //         targets: &[Some(wgpu::ColorTargetState {
+        //             // 4.
+        //             format: config.format,
+        //             blend: Some(wgpu::BlendState::REPLACE),
+        //             write_mask: wgpu::ColorWrites::ALL,
+        //         })],
+        //     }),
+        //     primitive: wgpu::PrimitiveState {
+        //         topology: wgpu::PrimitiveTopology::TriangleList, // 1.
+        //         strip_index_format: None,
+        //         front_face: wgpu::FrontFace::Ccw, // 2.
+        //         cull_mode: Some(wgpu::Face::Back),
+        //         // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
+        //         polygon_mode: wgpu::PolygonMode::Fill,
+        //         // Requires Features::DEPTH_CLIP_CONTROL
+        //         unclipped_depth: false,
+        //         // Requires Features::CONSERVATIVE_RASTERIZATION
+        //         conservative: false,
+        //     },
+        //     depth_stencil: None, // 1.
+        //     multisample: wgpu::MultisampleState {
+        //         count: 1,                         // 2.
+        //         mask: !0,                         // 3.
+        //         alpha_to_coverage_enabled: false, // 4.
+        //     },
+        //     multiview: None, // 5.
+        // });
 
         Self {
             surface,
@@ -235,6 +285,8 @@ impl State {
 
             scene,
 
+            blur,
+
             start_of_last_frame_instant: last_frame_time,
             delta_time,
 
@@ -243,11 +295,13 @@ impl State {
 
             frame_number: 0,
 
-            postprocessing_pipeline,
-            postprocessing_vertex_buffer,
-            num_postprocessing_vertices,
-            postprocessing_input_bind_group,
-            scene_texture,
+            // postprocessing_pipeline,
+            // postprocessing_vertex_buffer,
+            // num_postprocessing_vertices,
+            // postprocessing_input_bind_group,
+            // scene_texture,
+
+            // i_t,
         }
     }
 
@@ -266,7 +320,9 @@ impl State {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Bgra8UnormSrgb,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[],
         });
 
@@ -337,12 +393,13 @@ impl State {
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
-            self.scene.resize(new_size, &self.config);
+            self.scene.resize(&self.device, &self.queue, &self.config);
+            self.blur.resize(&self.device, &self.queue, &self.config, &self.scene.output_texture_view);
             //?
             let (scene_texture, _postprocessing_input_bind_group_layout, postprocessing_input_bind_group) =
                 Self::create_scene_texture(&self.device, &self.config);
-            self.scene_texture = scene_texture;
-            self.postprocessing_input_bind_group = postprocessing_input_bind_group;
+            // self.scene_texture = scene_texture;
+            // self.postprocessing_input_bind_group = postprocessing_input_bind_group;
         }
     }
 
@@ -371,17 +428,21 @@ impl State {
         self.start_of_last_frame_instant += self.delta_time;
         // update controllers
         self.settings_controller.update_settings(&mut self.settings);
-        self.scene.update(self.delta_time, self.prev_cursor_position, self.cursor_position, &self.queue);
+        self.scene.update(
+            self.delta_time,
+            self.prev_cursor_position,
+            self.cursor_position,
+            &self.queue,
+        );
         self.prev_cursor_position = self.cursor_position;
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-
         let render_start = Instant::now();
 
         // flame::start("render");
 
-        let scene_view = self.scene_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        // let scene_view = self.scene_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         // for _ in 0..100 {
         // self.surface.get_current_texture()?;
@@ -395,42 +456,43 @@ impl State {
         });
 
         // flame::start("scene pass");
-        self.scene.render(&mut encoder, &scene_view);
+        self.scene.render(&mut encoder, None);
         // flame::end("scene pass");
 
-        // flame::start("get current texture on surface");
+        self.blur.render(&mut encoder, Some(&output_view));
+        // blur(&self.device, &mut encoder, &self.scene_texture, &self.i_t);
 
         // flame::start("postprocessing pass");
 
-        {
-            let mut postprocessing_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Scene Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &output_view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.2,
-                            b: 0.8,
-                            a: 1.0,
-                        }),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
+        // {
+        //     let mut postprocessing_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        //         label: Some("Scene Pass"),
+        //         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+        //             view: &output_view,
+        //             resolve_target: None,
+        //             ops: wgpu::Operations {
+        //                 load: wgpu::LoadOp::Clear(wgpu::Color {
+        //                     r: 0.1,
+        //                     g: 0.2,
+        //                     b: 0.8,
+        //                     a: 1.0,
+        //                 }),
+        //                 store: wgpu::StoreOp::Store,
+        //             },
+        //         })],
+        //         depth_stencil_attachment: None,
+        //         timestamp_writes: None,
+        //         occlusion_query_set: None,
+        //     });
 
-            postprocessing_pass.set_pipeline(&self.postprocessing_pipeline);
+        //     postprocessing_pass.set_pipeline(&self.postprocessing_pipeline);
 
-            postprocessing_pass.set_vertex_buffer(0, self.postprocessing_vertex_buffer.slice(..));
+        //     postprocessing_pass.set_vertex_buffer(0, self.postprocessing_vertex_buffer.slice(..));
 
-            postprocessing_pass.set_bind_group(0, &self.postprocessing_input_bind_group, &[]);
+        //     postprocessing_pass.set_bind_group(0, &self.postprocessing_input_bind_group, &[]);
 
-            postprocessing_pass.draw(0..self.num_postprocessing_vertices, 0..1);
-        }
+        //     postprocessing_pass.draw(0..self.num_postprocessing_vertices, 0..1);
+        // }
 
         // flame::end("postprocessing pass");
         // flame::start("pp queue submit");

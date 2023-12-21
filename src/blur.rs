@@ -6,119 +6,72 @@ use crate::{
     texture::Texture,
     uniforms::CameraUniform,
     vertex::PostProcessingVertex,
-    vertices::{POSTPROCESSING_VERTICES},
+    vertices::POSTPROCESSING_VERTICES,
 };
 
-use glam::{vec2, vec3, Vec2, Vec3};
+use glam::{uvec2, vec2, vec3, UVec2, Vec2, Vec3};
 
 use std::f32::consts::PI;
 
-use wgpu::util::DeviceExt;
+use wgpu::{util::DeviceExt};
 
-use winit::{event::{VirtualKeyCode, WindowEvent}, dpi::PhysicalPosition};
+use winit::{
+    dpi::PhysicalPosition,
+    event::{VirtualKeyCode, WindowEvent},
+};
 
 use cfg_if::cfg_if;
 
 use std::time::Duration;
 
-
 pub struct Blur {
-    pub uniform_bind_group: wgpu::BindGroup,
-
-    pub space_texture_bind_group: wgpu::BindGroup,
-
+    pub bind_group: wgpu::BindGroup,
     pub render_pipeline: wgpu::RenderPipeline,
+    pub vertex_buffer: wgpu::Buffer,
+    pub num_vertices: u32,
+    pub output_texture: wgpu::Texture,
+    pub output_texture_view: wgpu::TextureView,
+    pub resolution_uniform: UVec2,
+    pub resolution_uniform_buffer: wgpu::Buffer,
 }
 
 impl Blur {
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, config: &wgpu::SurfaceConfiguration) -> Self {
+    pub fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        config: &wgpu::SurfaceConfiguration,
+        input_texture_view: &wgpu::TextureView,
+    ) -> Self {
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(POSTPROCESSING_VERTICES),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        let num_vertices = POSTPROCESSING_VERTICES.len() as u32;
 
-        let uniform_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
-            label: Some("camera uniforms"),
+        let (output_texture, output_texture_view) = Self::create_output_texture(device, config);
+
+        // or include_wgsl!
+        let blur_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("blur_shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("./blur.wgsl").into()),
         });
 
-        let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &uniform_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: camera_uniform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: other_uniforms_buffer.as_entire_binding(),
-                },
-            ],
-            label: Some("camera uniforms"),
+        let resolution_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            size: std::mem::size_of::<UVec2>() as wgpu::BufferAddress,
+            label: Some("blur resolution_uniform_buffer"),
+            mapped_at_creation: false,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let space_texture_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-            label: Some("space_bind_group_layout"),
-        });
+        let resolution_uniform = Self::create_resolution(queue, config, &resolution_uniform_buffer);
 
-        let space_texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &space_texture_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&space_texture.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&space_texture.sampler),
-                },
-            ],
-            label: Some("space_bind_group"),
-        });
-
-        let black_hole_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("black_hole_shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("./black_hole_maybe.wgsl").into()),
-        });
+        let (bing_group_layout, bind_group) =
+            Self::create_bind_group(device, input_texture_view, &resolution_uniform_buffer);
 
         let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("scene Pipeline Layout"),
-            bind_group_layouts: &[&uniform_bind_group_layout, &space_texture_bind_group_layout],
+            bind_group_layouts: &[&bing_group_layout],
             push_constant_ranges: &[],
         });
 
@@ -126,13 +79,13 @@ impl Blur {
             label: Some("scene Pipeline"),
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &black_hole_shader,
+                module: &blur_shader,
                 entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
+                buffers: &[PostProcessingVertex::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 // 3.
-                module: &black_hole_shader,
+                module: &blur_shader,
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     // 4.
@@ -159,83 +112,125 @@ impl Blur {
             multiview: None,
         });
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(VERTICES),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(INDICES),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-
-        let num_indices = INDICES.len() as u32;
-
         Self {
-
-            camera,
-            camera_controller,
-
-            camera_uniform,
-            camera_uniform_buffer,
-
-            other_uniforms,
-            other_uniforms_buffer,
-
-            uniform_bind_group,
-
-            space_texture_bind_group,
+            output_texture,
+            bind_group,
 
             render_pipeline,
 
             vertex_buffer,
-            index_buffer,
-            num_indices,
+            num_vertices,
+
+            resolution_uniform,
+            resolution_uniform_buffer,
+
+            output_texture_view,
         }
     }
 
-    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>, config: &wgpu::SurfaceConfiguration) {
-        self.camera.aspect = config.width as f32 / config.height as f32;
+    pub fn create_resolution(queue: &wgpu::Queue, config: &wgpu::SurfaceConfiguration, buffer: &wgpu::Buffer) -> UVec2 {
+        let resolution_uniform = uvec2(config.width, config.height);
+        queue.write_buffer(buffer, 0, &resolution_uniform.uniform_buffer_content());
+        return resolution_uniform;
     }
 
-    pub fn process_event(&mut self, event: &WindowEvent, queue: &wgpu::Queue) -> bool {
-        let other_uniforms_event_result = self.other_uniforms.process_event(event);
-        if other_uniforms_event_result {
-            queue.write_buffer(
-                &self.other_uniforms_buffer,
-                0,
-                &self.other_uniforms.uniform_buffer_content(),
-            );
-        }
-        [
-            other_uniforms_event_result,
-            self.camera_controller.process_event(event),
-        ]
-        .iter()
-        .any(|&result| result)
+    pub fn create_bind_group(
+        device: &wgpu::Device,
+        input_texture_view: &wgpu::TextureView,
+        resolution_uniform_buffer: &wgpu::Buffer,
+    ) -> (wgpu::BindGroupLayout, wgpu::BindGroup) {
+        // ? could make this persistent in self
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+            label: Some("space_bind_group_layout"),
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(input_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: resolution_uniform_buffer.as_entire_binding(),
+                },
+            ],
+            label: Some("space_bind_group"),
+        });
+
+        return (bind_group_layout, bind_group);
     }
 
-    pub fn update(&mut self, delta_time: Duration, prev_cursor_position: Option<PhysicalPosition<f64>>, cursor_position: Option<PhysicalPosition<f64>>, queue: &wgpu::Queue) {
-        self.camera_controller.update_camera(
-            &mut self.camera,
-            delta_time,
-            match (prev_cursor_position, cursor_position) {
-                (Some(prev), Some(curr)) => vec2(curr.x as f32, curr.y as f32) != vec2(prev.x as f32, prev.y as f32),
-                _ => false,
+    pub fn create_output_texture(
+        device: &wgpu::Device,
+        config: &wgpu::SurfaceConfiguration,
+    ) -> (wgpu::Texture, wgpu::TextureView) {
+        let output_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("blur output_texture"),
+            mip_level_count: 1,
+            size: wgpu::Extent3d {
+                width: config.width,
+                height: config.height,
+                depth_or_array_layers: 1,
             },
-        );
+            format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            dimension: wgpu::TextureDimension::D2,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            sample_count: 0,
+            view_formats: &[],
+        });
 
-        self.camera_uniform.update(&self.camera);
+        let output_texture_view = output_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let data = self.camera_uniform.uniform_buffer_content();
-        queue.write_buffer(&self.camera_uniform_buffer, 0, &data);
+        return (output_texture, output_texture_view);
     }
 
-    pub fn render(&self, encoder: &mut wgpu::CommandEncoder, output_view: &wgpu::TextureView) {
-        let mut scene_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Scene Pass"),
+    pub fn resize(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        // new_size: winit::dpi::PhysicalSize<u32>,
+        config: &wgpu::SurfaceConfiguration,
+        input_texture_view: &wgpu::TextureView,
+    ) {
+        (self.output_texture, self.output_texture_view) = Self::create_output_texture(device, config);
+
+        self.resolution_uniform = Self::create_resolution(queue, config, &self.resolution_uniform_buffer);
+
+        (_, self.bind_group) = Self::create_bind_group(device, input_texture_view, &self.resolution_uniform_buffer);
+    }
+
+    pub fn render(&self, encoder: &mut wgpu::CommandEncoder, optional_output_view: Option<&wgpu::TextureView>) {
+        let output_view = match optional_output_view {
+            Some(output_view) => output_view,
+            None => &self.output_texture_view,
+        };
+        
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("blur render pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: output_view,
                 resolve_target: None,
@@ -254,16 +249,69 @@ impl Blur {
             occlusion_query_set: None,
         });
 
-        scene_pass.set_pipeline(&self.render_pipeline);
+        render_pass.set_pipeline(&self.render_pipeline);
 
-        scene_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        scene_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
 
-        scene_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-        // render_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
 
-        scene_pass.set_bind_group(1, &self.space_texture_bind_group, &[]);
-
-        scene_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+        render_pass.draw(0..self.num_vertices, 0..1);
     }
 }
+
+// pub fn blur(
+//     device: &wgpu::Device,
+//     encoder: &mut wgpu::CommandEncoder,
+//     source_texture: &wgpu::Texture,
+//     destination_texture: &wgpu::Texture,
+// ) {
+//     let source_texture_copy_view = wgpu::ImageCopyTexture {
+//         aspect: wgpu::TextureAspect::All,
+//         texture: &source_texture,
+//         mip_level: 0,
+//         origin: wgpu::Origin3d::ZERO,
+//     };
+
+//     let intermediate_texture_size = wgpu::Extent3d {
+//         width: source_texture.width() / 8,
+//         height: source_texture.height() / 8,
+//         depth_or_array_layers: 1,
+//     };
+
+//     let intermediate_texture = device.create_texture(&wgpu::TextureDescriptor {
+//         label: Some("blur destination_texture"),
+//         size: intermediate_texture_size,
+//         mip_level_count: 1,
+//         sample_count: 1,
+//         dimension: wgpu::TextureDimension::D2,
+//         format: wgpu::TextureFormat::Bgra8UnormSrgb,
+//         usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC,
+//         view_formats: &[],
+//     });
+
+//     let intermediate_texture_copy_view = wgpu::ImageCopyTexture {
+//         aspect: wgpu::TextureAspect::All,
+//         texture: &intermediate_texture,
+//         mip_level: 0,
+//         origin: wgpu::Origin3d::ZERO,
+//     };
+
+//     let destination_texture_copy_view = wgpu::ImageCopyTexture {
+//         aspect: wgpu::TextureAspect::All,
+//         texture: &destination_texture,
+//         mip_level: 0,
+//         origin: wgpu::Origin3d::ZERO,
+//     };
+
+//     encoder.copy_texture_to_texture(
+//         source_texture_copy_view,
+//         intermediate_texture_copy_view,
+//         intermediate_texture_size,
+//     );
+
+//     encoder.copy_texture_to_texture(
+//         intermediate_texture_copy_view,
+//         destination_texture_copy_view,
+//         intermediate_texture_size,
+//     );
+// }

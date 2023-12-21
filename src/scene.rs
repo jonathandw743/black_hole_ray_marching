@@ -9,7 +9,7 @@ use crate::{
     vertices::VERTICES,
 };
 
-use glam::{vec2, vec3, Vec2, Vec3};
+use glam::{vec2, vec3, Vec2, Vec3, UVec2, uvec2};
 
 use std::f32::consts::PI;
 
@@ -31,7 +31,7 @@ pub struct Scene {
     pub other_uniforms: OtherUniforms<6>,
     pub other_uniforms_buffer: wgpu::Buffer,
 
-    pub uniform_bind_group: wgpu::BindGroup,
+    pub bind_group: wgpu::BindGroup,
 
     pub space_texture_bind_group: wgpu::BindGroup,
 
@@ -40,10 +40,27 @@ pub struct Scene {
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub num_indices: u32,
+
+    pub output_texture: wgpu::Texture,
+    pub output_texture_view: wgpu::TextureView,
+
+    pub resolution_uniform: UVec2,
+    pub resolution_uniform_buffer: wgpu::Buffer,
 }
 
 impl Scene {
     pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, config: &wgpu::SurfaceConfiguration) -> Self {
+        let (output_texture, output_texture_view) = Self::create_output_texture(device, config);
+
+        let resolution_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            size: std::mem::size_of::<UVec2>() as wgpu::BufferAddress,
+            label: Some("blur resolution_uniform_buffer"),
+            mapped_at_creation: false,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let resolution_uniform = Self::create_resolution(queue, config, &resolution_uniform_buffer);
+
         let camera = Camera {
             pos: (0.0, 0.0, -20.0).into(),
             dir: (0.0, 0.0, 1.0).into(),
@@ -106,46 +123,7 @@ impl Scene {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let uniform_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
-            label: Some("camera uniforms"),
-        });
-
-        let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &uniform_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: camera_uniform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: other_uniforms_buffer.as_entire_binding(),
-                },
-            ],
-            label: Some("camera uniforms"),
-        });
+        let (bind_group_layout, bind_group) = Self::create_bind_group(device, &camera_uniform_buffer, &other_uniforms_buffer);
 
         cfg_if! {
             if #[cfg(target_arch = "wasm32")] {
@@ -201,7 +179,7 @@ impl Scene {
 
         let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("scene Pipeline Layout"),
-            bind_group_layouts: &[&uniform_bind_group_layout, &space_texture_bind_group_layout],
+            bind_group_layouts: &[&bind_group_layout, &space_texture_bind_group_layout],
             push_constant_ranges: &[],
         });
 
@@ -267,7 +245,7 @@ impl Scene {
             other_uniforms,
             other_uniforms_buffer,
 
-            uniform_bind_group,
+            bind_group,
 
             space_texture_bind_group,
 
@@ -276,10 +254,110 @@ impl Scene {
             vertex_buffer,
             index_buffer,
             num_indices,
+
+            output_texture,
+            output_texture_view,
+
+            resolution_uniform,
+            resolution_uniform_buffer,
         }
     }
 
-    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>, config: &wgpu::SurfaceConfiguration) {
+
+    pub fn create_resolution(queue: &wgpu::Queue, config: &wgpu::SurfaceConfiguration, buffer: &wgpu::Buffer) -> UVec2 {
+        let resolution_uniform = uvec2(config.width, config.height);
+        queue.write_buffer(buffer, 0, &resolution_uniform.uniform_buffer_content());
+        return resolution_uniform;
+    }
+
+    pub fn create_bind_group(
+        device: &wgpu::Device,
+        camera_uniform_buffer: &wgpu::Buffer,
+        other_uniforms_buffer: &wgpu::Buffer
+    ) -> (wgpu::BindGroupLayout, wgpu::BindGroup) {
+        // ? could make this persistent in self
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+            label: Some("space_bind_group_layout"),
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: other_uniforms_buffer.as_entire_binding(),
+                },
+            ],
+            label: Some("space_bind_group"),
+        });
+
+        return (bind_group_layout, bind_group);
+    }
+
+    pub fn create_output_texture(
+        device: &wgpu::Device,
+        config: &wgpu::SurfaceConfiguration,
+    ) -> (wgpu::Texture, wgpu::TextureView) {
+        let output_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("blur output_texture"),
+            mip_level_count: 1,
+            size: wgpu::Extent3d {
+                width: config.width,
+                height: config.height,
+                depth_or_array_layers: 1,
+            },
+            format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            dimension: wgpu::TextureDimension::D2,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            sample_count: 0,
+            view_formats: &[],
+        });
+
+        let output_texture_view = output_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        return (output_texture, output_texture_view);
+    }
+
+    pub fn resize(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        // new_size: winit::dpi::PhysicalSize<u32>,
+        config: &wgpu::SurfaceConfiguration,
+        // input_texture_view: &wgpu::TextureView,
+    ) {
+        (self.output_texture, self.output_texture_view) = Self::create_output_texture(device, config);
+
+        self.resolution_uniform = Self::create_resolution(queue, config, &self.resolution_uniform_buffer);
+
+        (_, self.bind_group) = Self::create_bind_group(device, &self.camera_uniform_buffer, &self.other_uniforms_buffer);
+
         self.camera.aspect = config.width as f32 / config.height as f32;
     }
 
@@ -316,9 +394,14 @@ impl Scene {
         queue.write_buffer(&self.camera_uniform_buffer, 0, &data);
     }
 
-    pub fn render(&self, encoder: &mut wgpu::CommandEncoder, output_view: &wgpu::TextureView) {
-        let mut scene_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Scene Pass"),
+    pub fn render(&self, encoder: &mut wgpu::CommandEncoder, optional_output_view: Option<&wgpu::TextureView>) {
+        let output_view = match optional_output_view {
+            Some(output_view) => output_view,
+            None => &self.output_texture_view,
+        };
+        
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("scene render_pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: output_view,
                 resolve_target: None,
@@ -337,16 +420,15 @@ impl Scene {
             occlusion_query_set: None,
         });
 
-        scene_pass.set_pipeline(&self.render_pipeline);
+        render_pass.set_pipeline(&self.render_pipeline);
 
-        scene_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        scene_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
-        scene_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-        // render_pass.set_bind_group(1, &self.uniform_bind_group, &[]);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
 
-        scene_pass.set_bind_group(1, &self.space_texture_bind_group, &[]);
+        render_pass.set_bind_group(1, &self.space_texture_bind_group, &[]);
 
-        scene_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+        render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
     }
 }
