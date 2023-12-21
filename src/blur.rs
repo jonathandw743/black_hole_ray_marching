@@ -163,7 +163,7 @@ impl Blur {
                     count: None,
                 },
             ],
-            label: Some("space_bind_group_layout"),
+            label: Some("blur bind_group_layout"),
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -178,7 +178,7 @@ impl Blur {
                     resource: resolution_uniform_buffer.as_entire_binding(),
                 },
             ],
-            label: Some("space_bind_group"),
+            label: Some("blur bind_group"),
         });
 
         return (bind_group_layout, bind_group);
@@ -198,8 +198,8 @@ impl Blur {
             },
             format: wgpu::TextureFormat::Bgra8UnormSrgb,
             dimension: wgpu::TextureDimension::D2,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            sample_count: 0,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            sample_count: 1,
             view_formats: &[],
         });
 

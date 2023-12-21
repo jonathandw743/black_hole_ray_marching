@@ -54,7 +54,7 @@ impl Scene {
 
         let resolution_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             size: std::mem::size_of::<UVec2>() as wgpu::BufferAddress,
-            label: Some("blur resolution_uniform_buffer"),
+            label: Some("scene resolution_uniform_buffer"),
             mapped_at_creation: false,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
@@ -123,7 +123,46 @@ impl Scene {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let (bind_group_layout, bind_group) = Self::create_bind_group(device, &camera_uniform_buffer, &other_uniforms_buffer);
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+            label: Some("scene bind_group_layout"),
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: other_uniforms_buffer.as_entire_binding(),
+                },
+            ],
+            label: Some("scene bind_group"),
+        });
 
         cfg_if! {
             if #[cfg(target_arch = "wasm32")] {
@@ -270,62 +309,12 @@ impl Scene {
         return resolution_uniform;
     }
 
-    pub fn create_bind_group(
-        device: &wgpu::Device,
-        camera_uniform_buffer: &wgpu::Buffer,
-        other_uniforms_buffer: &wgpu::Buffer
-    ) -> (wgpu::BindGroupLayout, wgpu::BindGroup) {
-        // ? could make this persistent in self
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
-            label: Some("space_bind_group_layout"),
-        });
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: camera_uniform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: other_uniforms_buffer.as_entire_binding(),
-                },
-            ],
-            label: Some("space_bind_group"),
-        });
-
-        return (bind_group_layout, bind_group);
-    }
-
     pub fn create_output_texture(
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
     ) -> (wgpu::Texture, wgpu::TextureView) {
         let output_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("blur output_texture"),
+            label: Some("scene output_texture"),
             mip_level_count: 1,
             size: wgpu::Extent3d {
                 width: config.width,
@@ -334,8 +323,8 @@ impl Scene {
             },
             format: wgpu::TextureFormat::Bgra8UnormSrgb,
             dimension: wgpu::TextureDimension::D2,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            sample_count: 0,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            sample_count: 1,
             view_formats: &[],
         });
 
@@ -355,8 +344,6 @@ impl Scene {
         (self.output_texture, self.output_texture_view) = Self::create_output_texture(device, config);
 
         self.resolution_uniform = Self::create_resolution(queue, config, &self.resolution_uniform_buffer);
-
-        (_, self.bind_group) = Self::create_bind_group(device, &self.camera_uniform_buffer, &self.other_uniforms_buffer);
 
         self.camera.aspect = config.width as f32 / config.height as f32;
     }
