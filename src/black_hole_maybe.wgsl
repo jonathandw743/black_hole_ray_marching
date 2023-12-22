@@ -241,8 +241,9 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
     // let angle = 2.0 * u.RS / b;
     // rd = normalize(ray_dir * cos(angle) + cross(ro_rd_cross, ray_dir) * sin(angle) + ro_rd_cross * dot(ro_rd_cross, ray_dir) * (1.0 - cos(angle)));
     // let 
-    let x = (atan2(rd.z, rd.x) + TWO_PI * 0.5) / TWO_PI;
-    let y = (-rd.y + 1.0) * 0.5;
+    let nrd = normalize(rd);
+    let x = (atan2(nrd.z, nrd.x) + TWO_PI * 0.5) / TWO_PI;
+    let y = (-nrd.y + 1.0) * 0.5;
     let col = tsw(t_diffuse, s_diffuse, vec2<f32>(x, y)).xyz;
     return col;
     // return rd * BG_BRIGHTNESS;
