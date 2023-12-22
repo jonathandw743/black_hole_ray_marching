@@ -60,18 +60,18 @@ pub struct State {
     pub settings_controller: SettingsController,
 
     pub scene: Scene,
-    pub blur_0: Blur,
-    pub blur_1: Blur,
-    pub blur_2: Blur,
-    pub blur_3: Blur,
-    pub blur_4: Blur,
-    pub blur_5: Blur,
-    pub blur_6: Blur,
-    pub blur_7: Blur,
-    pub blur_8: Blur,
-    pub blur_9: Blur,
-    pub blur_10: Blur,
-    pub blur_11: Blur,
+    pub blur: Blur,
+    // pub blur_1: Blur,
+    // pub blur_2: Blur,
+    // pub blur_3: Blur,
+    // pub blur_4: Blur,
+    // pub blur_5: Blur,
+    // pub blur_6: Blur,
+    // pub blur_7: Blur,
+    // pub blur_8: Blur,
+    // pub blur_9: Blur,
+    // pub blur_10: Blur,
+    // pub blur_11: Blur,
 
 
     // timing
@@ -171,18 +171,18 @@ impl State {
         // let (scene_texture, postprocessing_input_bind_group_layout, postprocessing_input_bind_group) =
         //     Self::create_scene_texture(&device, &config);
 
-        let blur_0 = Blur::new(&device, &queue, &config, &scene.output_texture_view);
-        let blur_1 = Blur::new(&device, &queue, &config, &blur_0.output_texture_view);
-        let blur_2 = Blur::new(&device, &queue, &config, &blur_1.output_texture_view);
-        let blur_3 = Blur::new(&device, &queue, &config, &blur_2.output_texture_view);
-        let blur_4 = Blur::new(&device, &queue, &config, &blur_3.output_texture_view);
-        let blur_5 = Blur::new(&device, &queue, &config, &blur_4.output_texture_view);
-        let blur_6 = Blur::new(&device, &queue, &config, &blur_5.output_texture_view);
-        let blur_7 = Blur::new(&device, &queue, &config, &blur_6.output_texture_view);
-        let blur_8 = Blur::new(&device, &queue, &config, &blur_7.output_texture_view);
-        let blur_9 = Blur::new(&device, &queue, &config, &blur_8.output_texture_view);
-        let blur_10 = Blur::new(&device, &queue, &config, &blur_9.output_texture_view);
-        let blur_11 = Blur::new(&device, &queue, &config, &blur_10.output_texture_view);
+        let blur = Blur::new(&device, &queue, &config, &scene.output_texture_view);
+        // let blur_1 = Blur::new(&device, &queue, &config, &blur_0.output_texture_view);
+        // let blur_2 = Blur::new(&device, &queue, &config, &blur_1.output_texture_view);
+        // let blur_3 = Blur::new(&device, &queue, &config, &blur_2.output_texture_view);
+        // let blur_4 = Blur::new(&device, &queue, &config, &blur_3.output_texture_view);
+        // let blur_5 = Blur::new(&device, &queue, &config, &blur_4.output_texture_view);
+        // let blur_6 = Blur::new(&device, &queue, &config, &blur_5.output_texture_view);
+        // let blur_7 = Blur::new(&device, &queue, &config, &blur_6.output_texture_view);
+        // let blur_8 = Blur::new(&device, &queue, &config, &blur_7.output_texture_view);
+        // let blur_9 = Blur::new(&device, &queue, &config, &blur_8.output_texture_view);
+        // let blur_10 = Blur::new(&device, &queue, &config, &blur_9.output_texture_view);
+        // let blur_11 = Blur::new(&device, &queue, &config, &blur_10.output_texture_view);
 
         // time stuff
 
@@ -301,18 +301,18 @@ impl State {
 
             scene,
 
-            blur_0,
-            blur_1,
-            blur_2,
-            blur_3,
-            blur_4,
-            blur_5,
-            blur_6,
-            blur_7,
-            blur_8,
-            blur_9,
-            blur_10,
-            blur_11,
+            blur,
+            // blur_1,
+            // blur_2,
+            // blur_3,
+            // blur_4,
+            // blur_5,
+            // blur_6,
+            // blur_7,
+            // blur_8,
+            // blur_9,
+            // blur_10,
+            // blur_11,
 
             start_of_last_frame_instant: last_frame_time,
             delta_time,
@@ -421,18 +421,18 @@ impl State {
             self.surface.configure(&self.device, &self.config);
             self.scene.resize(&self.device, &self.queue, &self.config);
 
-            self.blur_0.resize(&self.device, &self.queue, &self.config, &self.scene.output_texture_view);
-            self.blur_1.resize(&self.device, &self.queue, &self.config, &self.blur_0.output_texture_view);
-            self.blur_2.resize(&self.device, &self.queue, &self.config, &self.blur_1.output_texture_view);
-            self.blur_3.resize(&self.device, &self.queue, &self.config, &self.blur_2.output_texture_view);
-            self.blur_4.resize(&self.device, &self.queue, &self.config, &self.blur_3.output_texture_view);
-            self.blur_5.resize(&self.device, &self.queue, &self.config, &self.blur_4.output_texture_view);
-            self.blur_6.resize(&self.device, &self.queue, &self.config, &self.blur_5.output_texture_view);
-            self.blur_7.resize(&self.device, &self.queue, &self.config, &self.blur_6.output_texture_view);
-            self.blur_8.resize(&self.device, &self.queue, &self.config, &self.blur_7.output_texture_view);
-            self.blur_9.resize(&self.device, &self.queue, &self.config, &self.blur_8.output_texture_view);
-            self.blur_10.resize(&self.device, &self.queue, &self.config, &self.blur_9.output_texture_view);
-            self.blur_11.resize(&self.device, &self.queue, &self.config, &self.blur_10.output_texture_view);
+            self.blur.resize(&self.device, &self.queue, &self.config, &self.scene.output_texture_view);
+            // self.blur_1.resize(&self.device, &self.queue, &self.config, &self.blur_0.output_texture_view);
+            // self.blur_2.resize(&self.device, &self.queue, &self.config, &self.blur_1.output_texture_view);
+            // self.blur_3.resize(&self.device, &self.queue, &self.config, &self.blur_2.output_texture_view);
+            // self.blur_4.resize(&self.device, &self.queue, &self.config, &self.blur_3.output_texture_view);
+            // self.blur_5.resize(&self.device, &self.queue, &self.config, &self.blur_4.output_texture_view);
+            // self.blur_6.resize(&self.device, &self.queue, &self.config, &self.blur_5.output_texture_view);
+            // self.blur_7.resize(&self.device, &self.queue, &self.config, &self.blur_6.output_texture_view);
+            // self.blur_8.resize(&self.device, &self.queue, &self.config, &self.blur_7.output_texture_view);
+            // self.blur_9.resize(&self.device, &self.queue, &self.config, &self.blur_8.output_texture_view);
+            // self.blur_10.resize(&self.device, &self.queue, &self.config, &self.blur_9.output_texture_view);
+            // self.blur_11.resize(&self.device, &self.queue, &self.config, &self.blur_10.output_texture_view);
             //?
             let (scene_texture, _postprocessing_input_bind_group_layout, postprocessing_input_bind_group) =
                 Self::create_scene_texture(&self.device, &self.config);
@@ -494,10 +494,10 @@ impl State {
         });
 
         // flame::start("scene pass");
-        self.scene.render(&mut encoder, Some(&output_view));
+        self.scene.render(&mut encoder, None);
         // flame::end("scene pass");
 
-        // self.blur_0.render(&mut encoder, None);
+        self.blur.render(&mut encoder, Some(&output_view));
         // self.blur_1.render(&mut encoder, None);
         // self.blur_2.render(&mut encoder, None);
         // self.blur_3.render(&mut encoder, None);

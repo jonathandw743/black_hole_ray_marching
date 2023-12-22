@@ -244,7 +244,10 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
     let nrd = normalize(rd);
     let x = (atan2(nrd.z, nrd.x) + TWO_PI * 0.5) / TWO_PI;
     let y = (-nrd.y + 1.0) * 0.5;
-    let col = tsw(t_diffuse, s_diffuse, vec2<f32>(x, y)).xyz;
+    // if x > 0.49 && x < 0.51 && y > 0.49 && y < 0.51 {
+    //     return vec3<f32>(100.0, 0.0, 0.0);
+    // }
+    let col = 2.0 * tsw(t_diffuse, s_diffuse, vec2<f32>(x, y)).xyz;
     return col;
     // return rd * BG_BRIGHTNESS;
 }
