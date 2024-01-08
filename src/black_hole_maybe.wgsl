@@ -59,6 +59,10 @@ fn u32_to_bool(n: u32) -> bool {
     return n != 0u;
 }
 
+fn sdf_sphere(p: vec3<f32>, centre: vec3<f32>, r: f32) -> f32 {
+    return length(centre - p) - r;
+}
+
 fn sdf_plane(p: vec3<f32>, y: f32) -> f32 {
     return abs(p.y - y) - 0.02;
 }
@@ -72,23 +76,12 @@ fn sdf_accretion_disk(p: vec3<f32>, centre: vec3<f32>, big_r: f32, little_r: f32
 }
 
 fn get_dist(p: vec3<f32>) -> f32 {
-    // let sd_sphere_bh = sdf_sphere(p, vec3<f32>(0.0, 0.0, 0.0), 0.8);
-
     let sd_accretion_disk = sdf_accretion_disk(p, vec3<f32>(0.0), 6.0 * u.RS, 3.0 * u.RS);
-
-    // return min(sd_sphere_bh, sd_accretion_disk);
     return sd_accretion_disk;
 }
 
-// fn pow_fivehalfs(x: f32) -> f32 {
-//     return x * x * x * inverseSqrt(x);
-// }
-
 fn rd_derivative(ro: vec3<f32>, h2: f32) -> vec3<f32> {
-    // return vec3<f32>(0.0);
-
     return u.DISTORTION_POWER * u.RS * -1.5 * h2 * ro / pow(dot(ro, ro), 2.5);
-    // return u.DISTORTION_POWER * u.RS * -1.5 * h2 * ro / pow_fivehalfs(dot(ro, ro));
 }
 
 @group(1) @binding(0)
@@ -154,16 +147,12 @@ fn get_delta_photon_rk2(ro: vec3<f32>, rd: vec3<f32>, delta_time: f32, h2: f32) 
 }
 
 fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
-    // let BLACK_HOLE: BlackHole = BlackHole(vec3<f32>(0.0, 0.0, 0.0), BLACK_HOLE_MASS);
-    
-    // var photon = Photon(ray_origin, ray_dir);
     var ro = ray_origin;
     var rd = ray_dir;
     var ro_rd_cross = cross(ro, rd);
     var h2 = dot(ro_rd_cross, ro_rd_cross);
 
     var distance_travelled = 0.0;
-    // for (var i = 0; i < (2 * )i32(MAX_DIST / MAX_DELTA_TIME); i++) {
     for (var i = 0; i < MAX_ITERATIONS; i++) {
 
         let dist_to_bh_sq = dot(ro, ro);
@@ -182,38 +171,6 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
         }
 
         let dist = min(dist_0, ps_dist);
-        
-        // let rate_of_change_of_rd = rd_derivative(ro, h2);
-
-        // var delta_time = 0.0;
-        // // can interpret dist as a time due to c = 1
-        // if dist < u.MAX_DELTA_TIME {
-        //     delta_time = dist;
-        //     let delta_photon = get_delta_photon(ro, rd, delta_time, h2);
-
-        //     ro += delta_photon.ro;
-        //     rd += delta_photon.rd;
-        // } else {
-        //     delta_time = u.MAX_DELTA_TIME;
-        //     var delta_photon = get_delta_photon(ro, rd, delta_time, h2);
-            
-        //     let sf = 0.0001 / length(delta_photon.rd);
-
-        //     delta_time = clamp(sf, u.MAX_DELTA_TIME, 1.0);
-
-        //     if dist < delta_time {
-        //         delta_time = dist;
-        //     }
-                
-        //     delta_photon = get_delta_photon(ro, rd, delta_time, h2);
-
-        //     ro += delta_photon.ro;
-        //     rd += delta_photon.rd;
-
-        //     // return vec3<f32>(sf, sf, sf);
-        // }
-
-        // let delta_time = min(dist * 0.9, u.MAX_DELTA_TIME);
 
         let rd_der = rd_derivative(ro, h2);
 
@@ -231,29 +188,18 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
 
         distance_travelled += dd;
         if distance_travelled > u.MAX_DIST {
-            // return vec3<f32>(0.0, 1.0, 1.0);
             break;
         }
     }
-    // let b = sqrt(dot(ray_origin, ray_origin) + dot(ray_dir, ray_origin) * dot(ray_dir, ray_origin));
-    // let lro = length(ray_origin);
-    // // let angle = atan2(b, lro) + 2.0 * u.RS / b;
-    // let angle = 2.0 * u.RS / b;
-    // rd = normalize(ray_dir * cos(angle) + cross(ro_rd_cross, ray_dir) * sin(angle) + ro_rd_cross * dot(ro_rd_cross, ray_dir) * (1.0 - cos(angle)));
-    // let 
     let nrd = normalize(rd);
     let x = (atan2(nrd.z, nrd.x) + TWO_PI * 0.5) / TWO_PI;
     let y = (-nrd.y + 1.0) * 0.5;
-    // if x > 0.49 && x < 0.51 && y > 0.49 && y < 0.51 {
-    //     return vec3<f32>(100.0, 0.0, 0.0);
-    // }
+
     let col = tsw(t_diffuse, s_diffuse, vec2<f32>(x, y)).xyz;
     return col;
-    // return rd * BG_BRIGHTNESS;
 }
 
 fn map_col_component_infinity_to_one(component: f32) -> f32 {
-    // return 1.0 - exp(-component);
     return 1.0 - 1.0 / (component + 1.0);
 }
 
@@ -268,171 +214,3 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let mapped_col = map_col_infinity_to_one(col);
     return vec4<f32>(mapped_col, 1.0);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-fn sdf_sphere(p: vec3<f32>, centre: vec3<f32>, r: f32) -> f32 {
-    return length(centre - p) - r;
-}
-
-fn sdf_torus_1(p: vec3<f32>, centre: vec3<f32>, big_r: f32, little_r: f32) -> f32 {
-    let d = p - centre;
-    let sd_cylinder = length(d.xz) - big_r;
-    let sd_ring = sqrt(sd_cylinder * sd_cylinder + d.y * d.y);
-    return sd_ring - little_r;
-}
-fn get_practical_distance(d: Distance) -> f32 {
-    if d.is_infinte {
-        return 10000.0;
-    }
-    return d.dist;
-}
-
-struct Distance {
-    dist: f32,
-    is_infinte: bool,
-}
-
-fn dist_less_than(d0: Distance, d1: Distance) -> bool {
-    if d0.is_infinte {
-        return false;
-    }
-    if d1.is_infinte {
-        return true;
-    }
-    if d0.dist < d1.dist {
-        return true;
-    }
-    return false;
-}
-
-fn min_dist(d0: Distance, d1: Distance) -> Distance {
-    if d0.is_infinte {
-        return d1;
-    }
-    if d1.is_infinte {
-        return d0;
-    }
-    if d0.dist < d1.dist {
-        return d0;
-    }
-    return d1;
-}
-fn ray_march(ro: vec3<f32>, rd: vec3<f32>) -> Distance {
-    return Distance(0.0, false);
-}
-
-fn shadow_light_multiplier(p: vec3<f32>, normal: vec3<f32>, light_dir: vec3<f32>, light_dist_sq: Distance) -> f32 {
-    // if !SHADOWS_ENABLED {
-    //     return 1.0;
-    // }
-    let uninterrupted_light_dist = ray_march(p + 2.0 * MIN_DIST * normal, light_dir);
-    
-    if uninterrupted_light_dist.is_infinte {
-        return 1.0;
-    }
-    let uninterrupted_light_dist_sq = Distance(
-        uninterrupted_light_dist.dist *
-        uninterrupted_light_dist.dist,
-        false,
-    );
-    if !dist_less_than(uninterrupted_light_dist_sq, light_dist_sq) {
-        return 1.0;
-    }
-    return 0.0;
-}
-
-fn get_directional_light(normal: vec3<f32>, light_dir: vec3<f32>) -> f32 {
-    return dot(normal, light_dir);
-}
-// fn get_light(p: vec3<f32>, normal: vec3<f32>) -> f32 {
-
-//     var light_dir: vec3<f32>;
-//     var light_dist_sq: Distance;
-
-//     switch LIGHT_OPTION {
-//         case 0 {
-//             light_dir = LIGHT_DIR;
-//             light_dist_sq = Distance(0.0, true);
-//         }
-//         case 1 {
-//             let to_light = LIGHT_POS - p;
-
-//             light_dir = normalize(to_light);
-//             light_dist_sq = Distance(dot(to_light, to_light), false);
-//         }
-//         default {
-//             light_dir = LIGHT_DIR;
-//             light_dist_sq = Distance(0.0, true);
-//         }
-//     }
-
-//     // let try_vec = vec3<f32>(-light_dir.y, light_dir.x, -light_dir.z);
-//     // let tangent_0 = normalize(cross(light_dir, try_vec));
-//     // let tangent_1 = cross(light_dir, tangent_0);
-
-//     // let a = 0.05;
-
-//     // var total_shadow_light_multiplier = 0.0;
-
-//     // let n = 10.0;
-//     // for (var i = 0.0; i < n + 0.5; i += 1.0) {
-//     //     let theta = TWO_PI * i / n;
-//     //     let curr_tangent = cos(theta) * tangent_0 + sin(theta) * tangent_1;
-//     //     let curr_wonky_light_dir = normalize(normal + curr_tangent * a);
-//     //     total_shadow_light_multiplier += shadow_light_multiplier(p, normal, curr_wonky_light_dir, light_dist_sq);
-//     // }
-//     // total_shadow_light_multiplier /= n;
-
-//     ////////////////////////////////////////////////////////////////////////////////////////
-    
-//     // let tangent_2 = -0.5 * tangent_0 + RT_3_OVER_2 * tangent_1;
-//     // let tangent_3 = -0.5 * tangent_0 - RT_3_OVER_2 * tangent_1;
-
-//     // let normal_0 = normalize(light_dir + tangent_0 * a);
-//     // let normal_1 = normalize(light_dir + tangent_2 * a);
-//     // let normal_2 = normalize(light_dir + tangent_3 * a);
-
-//     // let total_shadow_light_multiplier = (
-//     //     shadow_light_multiplier(p, normal, normal_0, light_dist_sq) +
-//     //     shadow_light_multiplier(p, normal, normal_1, light_dist_sq) +
-//     //     shadow_light_multiplier(p, normal, normal_2, light_dist_sq)
-//     // ) / 3.0;
-
-//     let total_shadow_light_multiplier = 1.0;//shadow_light_multiplier(p, normal, light_dir, light_dist_sq);
-
-//     let ambient_occlusion_multiplier = 1.0;//pow(get_amident_occlusion(p, normal, 0.015, 20.0), 40.0);
-
-//     return ambient_occlusion_multiplier * total_shadow_light_multiplier * get_directional_light(normal, light_dir);
-// }
