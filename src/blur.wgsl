@@ -21,7 +21,11 @@ fn vs_main(
 @group(0) @binding(0)
 var t_diffuse: texture_2d<f32>;
 @group(0) @binding(1)
+var s_diffuse: sampler;
+@group(0) @binding(2)
 var<uniform> resolution: vec2<u32>;
+@group(0) @binding(3)
+var<uniform> blur_size: f32;
 
 
 fn linear(t: f32) -> f32 {
@@ -235,57 +239,108 @@ fn weirdcubicfunction(v: f32) -> vec4<f32> {
     return vec4<f32>(x, y, z, w) * (1.0/6.0);
 }
 
-fn textureBicubic(s_diffuse: sampler, t_diffuse: texture_2d<f32>, texCoords: vec2<f32>) -> vec4<f32> {
-    // get the size of the t_diffuse
-    // let texSize = t_diffuse.size;
-    let texSize = vec2<f32>(100.0, 100.0);
-    // and its inverse
-    let invTexSize = 1.0 / texSize;
+// fn textureBicubic(s_diffuse: sampler, t_diffuse: texture_2d<f32>, texCoords: vec2<f32>, blur_size: f32) -> vec3<f32> {
+//     // get the size of the t_diffuse
+//     // let texSize = t_diffuse.size;
+//     let texSize = vec2<f32>(100.0, 100.0);
+//     // and its inverse
+//     let invTexSize = 1.0 / texSize;
 
-    // get the pixel pos corresponding to the input texCoords
-    let pixel_pos = texCoords * texSize - 0.5;
+//     // get the pixel pos corresponding to the input texCoords
+//     let pixel_pos = texCoords * texSize - 0.5;
 
-    // where the sample is in the square (like fract pp)
-    let fract_pp = fract(pixel_pos);
-    // the pixel pos to use in sampling (like floor pp)
-    let floor_pp = floor(pixel_pos);
+//     // where the sample is in the square (like fract pp)
+//     let fract_pp = fract(pixel_pos);
+//     // the pixel pos to use in sampling (like floor pp)
+//     let floor_pp = floor(pixel_pos);
 
-    // ok then, idk
-    // maybe like getting t from a linear t with some interpolation function?
-    let xcubic = weirdcubicfunction(fract_pp.x);
-    let ycubic = weirdcubicfunction(fract_pp.y);
+//     // ok then, idk
+//     // maybe like getting t from a linear t with some interpolation function?
+//     let xcubic = weirdcubicfunction(fract_pp.x);
+//     let ycubic = weirdcubicfunction(fract_pp.y);
 
-    // idk
-    // the centre coordinates of each pixel to sample of each 
-    let c = vec4<f32>(floor_pp.x - 0.5, floor_pp.x + 1.5, floor_pp.y - 0.5, floor_pp.y + 1.5);
+//     // idk
+//     // the centre coordinates of each pixel to sample of each 
+//     let c = vec4<f32>(floor_pp.x - 1.0, floor_pp.x + 1.0, floor_pp.y - 1.0, floor_pp.y + 1.0);
 
-    // idk
-    let s_part_1 = xcubic.xz + xcubic.yw;
-    let s_part_2 = ycubic.xz + ycubic.yw;
-    let s = vec4<f32>(s_part_1.x, s_part_1.y, s_part_2.x, s_part_2.y);
+//     // idk
+//     let s_part_1 = xcubic.xz + xcubic.yw;
+//     let s_part_2 = ycubic.xz + ycubic.yw;
+//     let s = vec4<f32>(s_part_1.x, s_part_1.y, s_part_2.x, s_part_2.y);
     
-    // idk
-    var offset = c + vec4<f32>(xcubic.yw, ycubic.yw) / s;
+//     // idk
+//     var offset = c + vec4<f32>(xcubic.yw, ycubic.yw) / s;
 
-    // mapping this offset back to 0 to 1 uv space for the t_diffuseSample fucntion
-    offset *= invTexSize.xxyy;
+//     // mapping this offset back to 0 to 1 uv space for the t_diffuseSample fucntion
+//     offset *= invTexSize.xxyy;
 
-    // the actual samples (only 4, that's good compared to the 16 for 'real' bicubic interpolation)
-    let sample0 = textureSample(t_diffuse, s_diffuse, offset.xz);
-    let sample1 = textureSample(t_diffuse, s_diffuse, offset.yz);
-    let sample2 = textureSample(t_diffuse, s_diffuse, offset.xw);
-    let sample3 = textureSample(t_diffuse, s_diffuse, offset.yw);
+//     // the actual samples (only 4, that's good compared to the 16 for 'real' bicubic interpolation)
+//     let sample0 = textureSample(t_diffuse, s_diffuse, offset.xz).xyz;
+//     let sample1 = textureSample(t_diffuse, s_diffuse, offset.yz).xyz;
+//     let sample2 = textureSample(t_diffuse, s_diffuse, offset.xw).xyz;
+//     let sample3 = textureSample(t_diffuse, s_diffuse, offset.yw).xyz;
 
-    // idk
-    let sx = s.x / (s.x + s.y);
-    let sy = s.z / (s.z + s.w);
+//     // idk
+//     let sx = s.x / (s.x + s.y);
+//     let sy = s.z / (s.z + s.w);
 
-    // linear mixing between some places
-    // this is a 2d mix accross a 2d space
-    return mix(
-        mix(sample3, sample2, sx), mix(sample1, sample0, sx)
-, sy);
-}
+//     // linear mixing between some places
+//     // this is a 2d mix accross a 2d space
+//     return mix(
+//         mix(sample3, sample2, sx), mix(sample1, sample0, sx)
+// , sy);
+// }
+// fn textureBicubic(s_diffuse: sampler, t_diffuse: texture_2d<f32>, texCoords: vec2<f32>) -> vec4<f32> {
+//     // get the size of the t_diffuse
+//     // let texSize = t_diffuse.size;
+//     let texSize = vec2<f32>(100.0, 100.0);
+//     // and its inverse
+//     let invTexSize = 1.0 / texSize;
+
+//     // get the pixel pos corresponding to the input texCoords
+//     let pixel_pos = texCoords * texSize - 0.5;
+
+//     // where the sample is in the square (like fract pp)
+//     let fract_pp = fract(pixel_pos);
+//     // the pixel pos to use in sampling (like floor pp)
+//     let floor_pp = floor(pixel_pos);
+
+//     // ok then, idk
+//     // maybe like getting t from a linear t with some interpolation function?
+//     let xcubic = weirdcubicfunction(fract_pp.x);
+//     let ycubic = weirdcubicfunction(fract_pp.y);
+
+//     // idk
+//     // the centre coordinates of each pixel to sample of each 
+//     let c = vec4<f32>(floor_pp.x - 0.5, floor_pp.x + 1.5, floor_pp.y - 0.5, floor_pp.y + 1.5);
+
+//     // idk
+//     let s_part_1 = xcubic.xz + xcubic.yw;
+//     let s_part_2 = ycubic.xz + ycubic.yw;
+//     let s = vec4<f32>(s_part_1.x, s_part_1.y, s_part_2.x, s_part_2.y);
+    
+//     // idk
+//     var offset = c + vec4<f32>(xcubic.yw, ycubic.yw) / s;
+
+//     // mapping this offset back to 0 to 1 uv space for the t_diffuseSample fucntion
+//     offset *= invTexSize.xxyy;
+
+//     // the actual samples (only 4, that's good compared to the 16 for 'real' bicubic interpolation)
+//     let sample0 = textureSample(t_diffuse, s_diffuse, offset.xz).xyz;
+//     let sample1 = textureSample(t_diffuse, s_diffuse, offset.yz).xyz;
+//     let sample2 = textureSample(t_diffuse, s_diffuse, offset.xw).xyz;
+//     let sample3 = textureSample(t_diffuse, s_diffuse, offset.yw).xyz;
+
+//     // idk
+//     let sx = s.x / (s.x + s.y);
+//     let sy = s.z / (s.z + s.w);
+
+//     // linear mixing between some places
+//     // this is a 2d mix accross a 2d space
+//     return mix(
+//         mix(sample3, sample2, sx), mix(sample1, sample0, sx)
+// , sy);
+// }
 
 fn my_textureSample(t_diffuse: texture_2d<f32>, p: vec2<f32>, blur_size: f32) -> vec3<f32> {
     // the position of the pixel in the downsample
@@ -296,10 +351,22 @@ fn my_textureSample(t_diffuse: texture_2d<f32>, p: vec2<f32>, blur_size: f32) ->
     // this does not have a fractional component so identifies a pixel in the downsample
     let floor_pp = vec2<i32>(floor(pp) * blur_size);
     
-    let s0 = textureLoad(t_diffuse, vec2<i32>(floor_pp), 0).xyz;
-    let s1 = textureLoad(t_diffuse, vec2<i32>(floor_pp) + vec2<i32>(vec2<f32>(blur_size, 0.0)), 0).xyz;
-    let s2 = textureLoad(t_diffuse, vec2<i32>(floor_pp) + vec2<i32>(vec2<f32>(0.0, blur_size)), 0).xyz;
-    let s3 = textureLoad(t_diffuse, vec2<i32>(floor_pp) + vec2<i32>(vec2<f32>(blur_size, blur_size)), 0).xyz;
+    var s0 = map_col_one_to_infinity(textureLoad(t_diffuse, vec2<i32>(floor_pp), 0).xyz);
+    if dot(s0, s0) < 1.0 {
+        s0 = vec3<f32>(0.0);
+    }
+    var s1 = map_col_one_to_infinity(textureLoad(t_diffuse, vec2<i32>(floor_pp) + vec2<i32>(vec2<f32>(blur_size, 0.0)), 0).xyz);
+    if dot(s1, s1) < 1.0 {
+        s1 = vec3<f32>(0.0);
+    }
+    var s2 = map_col_one_to_infinity(textureLoad(t_diffuse, vec2<i32>(floor_pp) + vec2<i32>(vec2<f32>(0.0, blur_size)), 0).xyz);
+    if dot(s2, s2) < 1.0 {
+        s2 = vec3<f32>(0.0);
+    }
+    var s3 = map_col_one_to_infinity(textureLoad(t_diffuse, vec2<i32>(floor_pp) + vec2<i32>(vec2<f32>(blur_size, blur_size)), 0).xyz);
+    if dot(s3, s3) < 1.0 {
+        s3 = vec3<f32>(0.0);
+    }
 
     return mix(
         mix(s0, s1, fract_pp.x), mix(s2, s3, fract_pp.x), fract_pp.y
@@ -343,11 +410,53 @@ fn my_textureBicubic(t_diffuse: texture_2d<f32>, pixel_pos: vec2<f32>, blur_size
     );
 }
 
+// fn textureBicubic(t_diffuse: texture_2d<f32>, pixel_pos: vec2<f32>, blur_size: f32) -> vec3<f32> {
+//     // the position of the pixel in the downsample
+//     // this has a fractional component
+//     let pp = pixel_pos / blur_size;
+//     // where the pixel is inside the downsample's pixel
+//     let fract_pp = fract(pp);
+//     // this does not have a fractional component so identifies a pixel in the downsample
+//     let floor_pp = floor(pp);
+    
+//     let x_cubic = weirdcubicfunction(fract_pp.x);
+//     let y_cubic = weirdcubicfunction(fract_pp.y);
+
+//     let c = vec4<f32>(floor_pp.x - 1.0, floor_pp.x + 1.0, floor_pp.y - 1.0, floor_pp.y + 1.0);
+
+//     let s = vec4<f32>(x_cubic.xz + x_cubic.yw, y_cubic.xz + y_cubic.yw);
+
+//     let offset = blur_size * (c + vec4<f32>(x_cubic.yw, y_cubic.yw) / s);
+
+//     let sample_0 = textureSample(t_diffuse, offset.xz, blur_size);
+//     let sample_1 = textureSample(t_diffuse, offset.yz, blur_size);
+//     let sample_2 = textureSample(t_diffuse, offset.xw, blur_size);
+//     let sample_3 = textureSample(t_diffuse, offset.yw, blur_size);
+
+//     let sx = s.x / (s.x + s.y);
+//     let sy = s.z / (s.z + s.w);
+
+//     return mix(
+//         mix(sample_3, sample_2, sx), mix(sample_1, sample_0, sx),
+//         sy
+//     );
+// }
+
 const PI: f32 = 3.14159265359;
 const ANGLE_INC: f32 = 0.5;
-const BLUR_SIZE: f32 = 64.0;
+// const BLUR_SIZE: f32 = 16.0;
 const BLUR_INC: f32 = 0.2;
 const POWER: f32 = 0.1;
+
+fn map_col_component_one_to_infinity(component: f32) -> f32 {
+    // return 1.0 - exp(-component);
+    // return 1.0 - 1.0 / (component + 1.0);
+    return 1.0 / (1.0 - component) - 1.0;
+}
+
+fn map_col_one_to_infinity(col: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(map_col_component_one_to_infinity(col.x), map_col_component_one_to_infinity(col.y), map_col_component_one_to_infinity(col.z));
+}
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
@@ -355,7 +464,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let fres = vec2<f32>(resolution);
     let pixel_pos = in.uv * fres;// / BLUR_SIZE;
 
-    let col = my_textureBicubic(t_diffuse, pixel_pos, BLUR_SIZE);
+    let actual_col = map_col_one_to_infinity(textureLoad(t_diffuse, vec2<i32>(pixel_pos), 0).xyz);
+    let blurred_col = my_textureBicubic(t_diffuse, pixel_pos, blur_size);
+    // let blurred_col = textureBicubic(s_diffuse, t_diffuse, pixel_pos, blur_size);
+
+    let col = actual_col + blurred_col * 0.5;
+// let col = blurred_col;
     //abc
     //def
     //ghi

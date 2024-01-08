@@ -73,7 +73,6 @@ pub struct State {
     // pub blur_10: Blur,
     // pub blur_11: Blur,
 
-
     // timing
     pub start_of_last_frame_instant: Instant,
     pub delta_time: Duration,
@@ -171,7 +170,12 @@ impl State {
         // let (scene_texture, postprocessing_input_bind_group_layout, postprocessing_input_bind_group) =
         //     Self::create_scene_texture(&device, &config);
 
-        let blur = Blur::new(&device, &queue, &config, &scene.output_texture_view);
+        let blur = Blur::new(
+            &device,
+            &queue,
+            &config,
+            &scene.output_texture_view,
+        );
         // let blur_1 = Blur::new(&device, &queue, &config, &blur_0.output_texture_view);
         // let blur_2 = Blur::new(&device, &queue, &config, &blur_1.output_texture_view);
         // let blur_3 = Blur::new(&device, &queue, &config, &blur_2.output_texture_view);
@@ -313,7 +317,6 @@ impl State {
             // blur_9,
             // blur_10,
             // blur_11,
-
             start_of_last_frame_instant: last_frame_time,
             delta_time,
 
@@ -421,7 +424,8 @@ impl State {
             self.surface.configure(&self.device, &self.config);
             self.scene.resize(&self.device, &self.queue, &self.config);
 
-            self.blur.resize(&self.device, &self.queue, &self.config, &self.scene.output_texture_view);
+            self.blur
+                .resize(&self.device, &self.queue, &self.config, &self.scene.output_texture_view);
             // self.blur_1.resize(&self.device, &self.queue, &self.config, &self.blur_0.output_texture_view);
             // self.blur_2.resize(&self.device, &self.queue, &self.config, &self.blur_1.output_texture_view);
             // self.blur_3.resize(&self.device, &self.queue, &self.config, &self.blur_2.output_texture_view);

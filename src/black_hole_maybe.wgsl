@@ -247,25 +247,25 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
     // if x > 0.49 && x < 0.51 && y > 0.49 && y < 0.51 {
     //     return vec3<f32>(100.0, 0.0, 0.0);
     // }
-    let col = 2.0 * tsw(t_diffuse, s_diffuse, vec2<f32>(x, y)).xyz;
+    let col = tsw(t_diffuse, s_diffuse, vec2<f32>(x, y)).xyz;
     return col;
     // return rd * BG_BRIGHTNESS;
 }
 
-fn map_col_component(component: f32) -> f32 {
+fn map_col_component_infinity_to_one(component: f32) -> f32 {
     // return 1.0 - exp(-component);
     return 1.0 - 1.0 / (component + 1.0);
 }
 
-fn map_col(col: vec3<f32>) -> vec3<f32> {
-    return vec3<f32>(map_col_component(col.x), map_col_component(col.y), map_col_component(col.z));
+fn map_col_infinity_to_one(col: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(map_col_component_infinity_to_one(col.x), map_col_component_infinity_to_one(col.y), map_col_component_infinity_to_one(col.z));
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let ray_dir = normalize(in.camera_to_vertex);
     let col = get_col(camera.pos.xyz, ray_dir);
-    let mapped_col = map_col(col);
+    let mapped_col = map_col_infinity_to_one(col);
     return vec4<f32>(mapped_col, 1.0);
 }
 
