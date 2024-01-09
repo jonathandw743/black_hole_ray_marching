@@ -25,6 +25,7 @@ mod vertex;
 mod vertices;
 mod scene;
 mod blur;
+mod bloom;
 
 mod state;
 use state::State;

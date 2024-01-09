@@ -207,10 +207,19 @@ fn map_col_infinity_to_one(col: vec3<f32>) -> vec3<f32> {
     return vec3<f32>(map_col_component_infinity_to_one(col.x), map_col_component_infinity_to_one(col.y), map_col_component_infinity_to_one(col.z));
 }
 
+struct FragmentOutput {
+    @location(0) col: vec4<f32>,
+    @location(1) blackout_col: vec4<f32>,
+}
+
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(in: VertexOutput) -> FragmentOutput {
     let ray_dir = normalize(in.camera_to_vertex);
     let col = get_col(camera.pos.xyz, ray_dir);
     let mapped_col = map_col_infinity_to_one(col);
-    return vec4<f32>(mapped_col, 1.0);
+    var blackout_mapped_col = mapped_col;
+    if dot(col, col) < 1.0 {
+        blackout_mapped_col = vec3<f32>(0.0);
+    }
+    return FragmentOutput(vec4<f32>(mapped_col, 1.0), vec4<f32>(blackout_mapped_col, 1.0));
 }

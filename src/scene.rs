@@ -9,13 +9,16 @@ use crate::{
     vertices::VERTICES,
 };
 
-use glam::{vec2, vec3, Vec2, Vec3, UVec2, uvec2};
+use glam::{uvec2, vec2, vec3, UVec2, Vec2, Vec3};
 
 use std::f32::consts::PI;
 
 use wgpu::util::DeviceExt;
 
-use winit::{event::{VirtualKeyCode, WindowEvent}, dpi::PhysicalPosition};
+use winit::{
+    dpi::PhysicalPosition,
+    event::{VirtualKeyCode, WindowEvent},
+};
 
 use cfg_if::cfg_if;
 
@@ -44,13 +47,18 @@ pub struct Scene {
     pub output_texture: wgpu::Texture,
     pub output_texture_view: wgpu::TextureView,
 
+    pub blackout_output_texture: wgpu::Texture,
+    pub blackout_output_texture_view: wgpu::TextureView,
+
     pub resolution_uniform: UVec2,
     pub resolution_uniform_buffer: wgpu::Buffer,
 }
 
 impl Scene {
     pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, config: &wgpu::SurfaceConfiguration) -> Self {
-        let (output_texture, output_texture_view) = Self::create_output_texture(device, config);
+        let (output_texture, output_texture_view) = Self::create_output_texture(device, config,);
+
+        let (blackout_output_texture, blackout_output_texture_view) = Self::create_output_texture(device, config);
 
         let resolution_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             size: std::mem::size_of::<UVec2>() as wgpu::BufferAddress,
@@ -231,15 +239,20 @@ impl Scene {
                 buffers: &[Vertex::desc()],
             },
             fragment: Some(wgpu::FragmentState {
-                // 3.
                 module: &black_hole_shader,
                 entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    // 4.
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
+                targets: &[
+                    Some(wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                    Some(wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                ],
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -274,7 +287,6 @@ impl Scene {
         let num_indices = INDICES.len() as u32;
 
         Self {
-
             camera,
             camera_controller,
 
@@ -297,11 +309,13 @@ impl Scene {
             output_texture,
             output_texture_view,
 
+            blackout_output_texture,
+            blackout_output_texture_view,
+            
             resolution_uniform,
             resolution_uniform_buffer,
         }
     }
-
 
     pub fn create_resolution(queue: &wgpu::Queue, config: &wgpu::SurfaceConfiguration, buffer: &wgpu::Buffer) -> UVec2 {
         let resolution_uniform = uvec2(config.width, config.height);
@@ -357,15 +371,18 @@ impl Scene {
                 &self.other_uniforms.uniform_buffer_content(),
             );
         }
-        [
-            other_uniforms_event_result,
-            self.camera_controller.process_event(event),
-        ]
-        .iter()
-        .any(|&result| result)
+        [other_uniforms_event_result, self.camera_controller.process_event(event)]
+            .iter()
+            .any(|&result| result)
     }
 
-    pub fn update(&mut self, delta_time: Duration, prev_cursor_position: Option<PhysicalPosition<f64>>, cursor_position: Option<PhysicalPosition<f64>>, queue: &wgpu::Queue) {
+    pub fn update(
+        &mut self,
+        delta_time: Duration,
+        prev_cursor_position: Option<PhysicalPosition<f64>>,
+        cursor_position: Option<PhysicalPosition<f64>>,
+        queue: &wgpu::Queue,
+    ) {
         self.camera_controller.update_camera(
             &mut self.camera,
             delta_time,
@@ -381,27 +398,47 @@ impl Scene {
         queue.write_buffer(&self.camera_uniform_buffer, 0, &data);
     }
 
-    pub fn render(&self, encoder: &mut wgpu::CommandEncoder, optional_output_view: Option<&wgpu::TextureView>) {
+    pub fn render(&self, encoder: &mut wgpu::CommandEncoder, optional_output_view: Option<&wgpu::TextureView>, optional_blackout_output_view: Option<&wgpu::TextureView>) {
         let output_view = match optional_output_view {
             Some(output_view) => output_view,
             None => &self.output_texture_view,
         };
-        
+
+        let blackout_output_view = match optional_blackout_output_view {
+            Some(output_view) => output_view,
+            None => &self.blackout_output_texture_view,
+        };
+
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("scene render_pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: output_view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 1.0,
-                        g: 0.2,
-                        b: 0.0,
-                        a: 1.0,
-                    }),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
+            color_attachments: &[
+                Some(wgpu::RenderPassColorAttachment {
+                    view: output_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 1.0,
+                            g: 0.2,
+                            b: 0.0,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                }),
+                Some(wgpu::RenderPassColorAttachment {
+                    view: blackout_output_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 1.0,
+                            g: 0.2,
+                            b: 0.0,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                }),
+            ],
             depth_stencil_attachment: None,
             timestamp_writes: None,
             occlusion_query_set: None,

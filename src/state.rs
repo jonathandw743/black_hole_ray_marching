@@ -498,10 +498,10 @@ impl State {
         });
 
         // flame::start("scene pass");
-        self.scene.render(&mut encoder, None);
+        self.scene.render(&mut encoder, None, Some(&output_view));
         // flame::end("scene pass");
 
-        self.blur.render(&mut encoder, Some(&output_view));
+        // self.blur.render(&mut encoder, Some(&output_view));
         // self.blur_1.render(&mut encoder, None);
         // self.blur_2.render(&mut encoder, None);
         // self.blur_3.render(&mut encoder, None);
