@@ -9,6 +9,7 @@ use winit::{event::*, window::Window};
 
 use glam::{vec2, Vec3};
 
+use crate::bloom::Bloom;
 use std::thread::sleep;
 // use std::time::{Duration, Instant};
 use crate::time_replacement::{Duration, Instant};
@@ -61,6 +62,7 @@ pub struct State {
 
     pub scene: Scene,
     pub blur: Blur,
+    pub bloom: Bloom,
     // pub blur_1: Blur,
     // pub blur_2: Blur,
     // pub blur_3: Blur,
@@ -170,12 +172,9 @@ impl State {
         // let (scene_texture, postprocessing_input_bind_group_layout, postprocessing_input_bind_group) =
         //     Self::create_scene_texture(&device, &config);
 
-        let blur = Blur::new(
-            &device,
-            &queue,
-            &config,
-            &scene.output_texture_view,
-        );
+        let blur = Blur::new(&device, &queue, &config, &scene.output_texture_view);
+
+        let bloom = Bloom::new(&device, &config, &scene.output_texture_view);
         // let blur_1 = Blur::new(&device, &queue, &config, &blur_0.output_texture_view);
         // let blur_2 = Blur::new(&device, &queue, &config, &blur_1.output_texture_view);
         // let blur_3 = Blur::new(&device, &queue, &config, &blur_2.output_texture_view);
@@ -306,6 +305,7 @@ impl State {
             scene,
 
             blur,
+            bloom,
             // blur_1,
             // blur_2,
             // blur_3,
@@ -426,6 +426,7 @@ impl State {
 
             self.blur
                 .resize(&self.device, &self.queue, &self.config, &self.scene.output_texture_view);
+            self.bloom.resize(&self.device, &self.config, &self.scene.output_texture_view);
             // self.blur_1.resize(&self.device, &self.queue, &self.config, &self.blur_0.output_texture_view);
             // self.blur_2.resize(&self.device, &self.queue, &self.config, &self.blur_1.output_texture_view);
             // self.blur_3.resize(&self.device, &self.queue, &self.config, &self.blur_2.output_texture_view);
@@ -498,7 +499,9 @@ impl State {
         });
 
         // flame::start("scene pass");
-        self.scene.render(&mut encoder, None, Some(&output_view));
+        self.scene.render(&mut encoder, None, None);
+
+        self.bloom.render(&mut encoder);
         // flame::end("scene pass");
 
         // self.blur.render(&mut encoder, Some(&output_view));
