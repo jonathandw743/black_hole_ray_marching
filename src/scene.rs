@@ -329,7 +329,7 @@ impl Scene {
     ) -> (wgpu::Texture, wgpu::TextureView) {
         let output_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("scene output_texture"),
-            mip_level_count: 4,
+            mip_level_count: 1,
             size: wgpu::Extent3d {
                 width: config.width,
                 height: config.height,
