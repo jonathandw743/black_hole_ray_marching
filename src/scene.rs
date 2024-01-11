@@ -85,7 +85,7 @@ impl Scene {
         camera_uniform.update(&camera);
 
         let camera_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("camer uniforms"),
+            label: Some("camera uniforms"),
             contents: &camera_uniform.uniform_buffer_content(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
@@ -176,7 +176,8 @@ impl Scene {
             if #[cfg(target_arch = "wasm32")] {
                 let space_bytes = include_bytes!("space_2048x1024.jpg");
             } else {
-                let space_bytes = include_bytes!("space_4096x2048.jpg");
+                let space_bytes = include_bytes!("green and red.png");
+                // let space_bytes = include_bytes!("space_4096x2048.jpg");
             }
         }
         let space_texture = Texture::from_bytes(&device, &queue, space_bytes, "space").unwrap();

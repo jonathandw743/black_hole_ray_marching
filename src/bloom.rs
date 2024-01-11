@@ -24,7 +24,7 @@ use cfg_if::cfg_if;
 
 use std::time::Duration;
 
-const MLC: usize = 4;
+const MLC: usize = 6;
 
 // #[repr(C)]
 // #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -33,29 +33,36 @@ const MLC: usize = 4;
 // }
 
 pub struct Bloom {
-    pub texture_sampler: wgpu::Sampler,
+    pub downsampling_texture_sampler: wgpu::Sampler,
+    pub upsampling_texture_sampler: wgpu::Sampler,
+
+    pub sampling_textures: Vec<(wgpu::Texture, wgpu::TextureView)>,
 
     pub downsampling_bind_group_layout: wgpu::BindGroupLayout,
-
-    pub downsampling_render_pipeline: wgpu::RenderPipeline,
-    pub downsampling_textures: Vec<(wgpu::Texture, wgpu::TextureView)>,
     pub downsampling_bind_groups: Vec<wgpu::BindGroup>,
+    pub downsampling_render_pipeline: wgpu::RenderPipeline,
 
-    pub upsampling_render_pipeline: wgpu::RenderPipeline,
+    pub upsampling_bind_group_layout: wgpu::BindGroupLayout,
     pub upsampling_bind_groups: Vec<wgpu::BindGroup>,
-    // pub output_texture: wgpu::Texture,
-    // pub output_texture_view: wgpu::TextureView,
-    // pub vertex_buffer: wgpu::Buffer,
+    pub upsampling_render_pipeline: wgpu::RenderPipeline,
 }
 
 impl Bloom {
     pub fn new(
         device: &wgpu::Device,
-        // queue: &wgpu::Queue,
         config: &wgpu::SurfaceConfiguration,
         input_texture_view: &wgpu::TextureView,
     ) -> Self {
-        let texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        let downsampling_texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+        let upsampling_texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -65,11 +72,11 @@ impl Bloom {
             ..Default::default()
         });
 
+        let sampling_textures = Self::create_textures(device, config);
+
         let screen_triangle_shader_module = device.create_shader_module(include_wgsl!("screen_triangle.wgsl"));
         let downsample_shader_module = device.create_shader_module(include_wgsl!("downsample.wgsl"));
         let upsample_shader_module = device.create_shader_module(include_wgsl!("upsample.wgsl"));
-
-        let downsampling_textures = Self::create_textures(device, config);
 
         let downsampling_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("downsampling bind group layout"),
@@ -93,26 +100,19 @@ impl Bloom {
             ],
         });
 
+        let downsampling_bind_groups = Self::create_downsampling_bind_groups(
+            device,
+            &downsampling_bind_group_layout,
+            &sampling_textures,
+            input_texture_view,
+            &downsampling_texture_sampler,
+        );
+
         let downsampling_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("downsampling pipeline layout"),
             bind_group_layouts: &[&downsampling_bind_group_layout],
             push_constant_ranges: &[],
         });
-
-        let downsampling_bind_groups = Self::create_downsampling_bind_groups(
-            device,
-            &downsampling_bind_group_layout,
-            &downsampling_textures,
-            input_texture_view,
-            &texture_sampler,
-        );
-
-        let upsampling_bind_groups = Self::create_upsampling_bind_groups(
-            device,
-            &downsampling_bind_group_layout,
-            &downsampling_textures,
-            &texture_sampler,
-        );
 
         let downsampling_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("scene Pipeline"),
@@ -149,9 +149,44 @@ impl Bloom {
             multiview: None,
         });
 
+        let upsampling_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("upsampling bind group layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+
+        let upsampling_bind_groups = Self::create_upsampling_bind_groups(
+            device,
+            &downsampling_bind_group_layout,
+            &sampling_textures,
+            &upsampling_texture_sampler,
+        );
+
+        let upsampling_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("upsampling pipeline layout"),
+            bind_group_layouts: &[&upsampling_bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
         let upsampling_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("scene Pipeline"),
-            layout: Some(&downsampling_pipeline_layout),
+            layout: Some(&upsampling_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &screen_triangle_shader_module,
                 entry_point: "main",
@@ -184,26 +219,19 @@ impl Bloom {
             multiview: None,
         });
 
-        // let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        //     label: Some("Vertex Buffer"),
-        //     contents: bytemuck::cast_slice(&[MV { foo: [0.0, 0.0] }; 3]),
-        //     usage: wgpu::BufferUsages::VERTEX,
-        // });
-
         Self {
-            texture_sampler,
+            downsampling_texture_sampler,
+            upsampling_texture_sampler,
+
+            sampling_textures,
 
             downsampling_bind_group_layout,
-
-            downsampling_textures,
             downsampling_bind_groups,
-
             downsampling_render_pipeline,
 
-            upsampling_render_pipeline,
+            upsampling_bind_group_layout,
             upsampling_bind_groups,
-
-            // vertex_buffer,
+            upsampling_render_pipeline,
         }
     }
 
@@ -286,7 +314,6 @@ impl Bloom {
         for level in 1..MLC {
             // create the bind group
             // first binding is the texture to be read from in the shader
-            // second binding is the texture to be written to in the shader
             let bind_group = Self::create_bind_group(
                 device,
                 Some(&format!("downsampling bind group {}", 0)),
@@ -312,10 +339,9 @@ impl Bloom {
         for level in 0..MLC {
             // create the bind group
             // first binding is the texture to be read from in the shader
-            // second binding is the texture to be written to in the shader
             let bind_group = Self::create_bind_group(
                 device,
-                Some(&format!("downsampling bind group {}", 0)),
+                Some(&format!("upsampling bind group {}", 0)),
                 layout,
                 &textures[level].1,
                 texture_sampler,
@@ -332,24 +358,30 @@ impl Bloom {
         config: &wgpu::SurfaceConfiguration,
         input_texture_view: &wgpu::TextureView,
     ) {
-        self.downsampling_textures = Self::create_textures(device, config);
+        self.sampling_textures = Self::create_textures(device, config);
         self.downsampling_bind_groups = Self::create_downsampling_bind_groups(
             device,
             &self.downsampling_bind_group_layout,
-            &self.downsampling_textures,
+            &self.sampling_textures,
             input_texture_view,
-            &self.texture_sampler,
+            &self.downsampling_texture_sampler,
         );
         self.upsampling_bind_groups = Self::create_upsampling_bind_groups(
             device,
             &self.downsampling_bind_group_layout,
-            &self.downsampling_textures,
-            &self.texture_sampler,
+            &self.sampling_textures,
+            &self.upsampling_texture_sampler,
         );
         // self.resolution_uniform = Self::create_resolution(queue, config, &self.resolution_uniform_buffer);
     }
 
-    pub fn render(&self, encoder: &mut wgpu::CommandEncoder, optional_output_texture_view: Option<&wgpu::TextureView>) {
+    pub fn render(&self, encoder: &mut wgpu::CommandEncoder, optional_output_view: Option<&wgpu::TextureView>) {
+
+        // let output_view = match optional_output_view {
+        //     Some(output_view) => output_view,
+        //     None => &,
+        // };
+
         // let output_view = match optional_output_view {
         //     Some(output_view) => output_view,
         //     None => &self.output_texture_view,
@@ -384,7 +416,7 @@ impl Bloom {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("blur render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.downsampling_textures[level].1,
+                    view: &self.sampling_textures[level].1,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -406,37 +438,37 @@ impl Bloom {
             render_pass.draw(0..3, 0..1);
         }
 
-        // for level in (1..MLC).rev() {
-        //     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        //         label: Some("blur render pass"),
-        //         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-        //             view: &self.downsampling_textures[level - 1].1,
-        //             resolve_target: None,
-        //             ops: wgpu::Operations {
-        //                 load: wgpu::LoadOp::Clear(wgpu::Color {
-        //                     r: 1.0,
-        //                     g: 0.0,
-        //                     b: 0.0,
-        //                     a: 1.0,
-        //                 }),
-        //                 store: wgpu::StoreOp::Store,
-        //             },
-        //         })],
-        //         depth_stencil_attachment: None,
-        //         timestamp_writes: None,
-        //         occlusion_query_set: None,
-        //     });
-        //     render_pass.set_pipeline(&self.upsampling_render_pipeline);
-        //     render_pass.set_bind_group(0, &self.upsampling_bind_groups[level], &[]);
-        //     // render_pass.set_vertex_buffer(slot, buffer_slice)
-        //     render_pass.draw(0..3, 0..1);
-        // }
+        for level in (1..MLC).rev() {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("blur render pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &self.sampling_textures[level - 1].1,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 1.0,
+                            g: 0.0,
+                            b: 0.0,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            render_pass.set_pipeline(&self.upsampling_render_pipeline);
+            render_pass.set_bind_group(0, &self.upsampling_bind_groups[level], &[]);
+            // render_pass.set_vertex_buffer(slot, buffer_slice)
+            render_pass.draw(0..3, 0..1);
+        }
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("blur render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: optional_output_texture_view.unwrap(),
+                    view: optional_output_view.unwrap(),
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -453,7 +485,7 @@ impl Bloom {
                 occlusion_query_set: None,
             });
             render_pass.set_pipeline(&self.upsampling_render_pipeline);
-            render_pass.set_bind_group(0, &self.upsampling_bind_groups[MLC - 1], &[]);
+            render_pass.set_bind_group(0, &self.upsampling_bind_groups[0], &[]);
             render_pass.draw(0..3, 0..1);
         }
     }
