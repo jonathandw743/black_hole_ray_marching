@@ -29,9 +29,11 @@ const MLC: usize = 4;
 pub struct Bloom {
     pub texture_sampler: wgpu::Sampler,
 
+    pub downsampling_bind_group_layout: wgpu::BindGroupLayout,
+
     pub downsampling_compute_pipeline: wgpu::ComputePipeline,
-    pub downsampling_textures: [(wgpu::Texture, wgpu::TextureView); MLC],
-    pub downsampling_bind_groups: [wgpu::BindGroup; MLC],
+    pub downsampling_textures: Vec<(wgpu::Texture, wgpu::TextureView)>,
+    pub downsampling_bind_groups: Vec<wgpu::BindGroup>,
 }
 
 impl Bloom {
@@ -59,24 +61,99 @@ impl Bloom {
             ..Default::default()
         });
 
-        let downsampling_compute_shader_module = device.create_shader_module(include_wgsl!("bloom.wgsl"));
-        let downsampling_compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            entry_point: "main",
-            label: Some("compute_pipeline"),
-            layout: None,
-            module: &downsampling_compute_shader_module,
-        });
+        let screen_triangle_shader_module = device.create_shader_module(include_wgsl!("screen_triangle.wgsl"));
+        let downsample_shader_module = device.create_shader_module(include_wgsl!("downsample.wgsl"));
         let downsampling_textures = Self::create_textures(device, config);
+        let downsampling_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("downsampling bind group layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::StorageTexture {
+                        access: wgpu::StorageTextureAccess::WriteOnly,
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        view_dimension: wgpu::TextureViewDimension::D2
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
         let downsampling_bind_groups = Self::create_bind_groups(
             device,
-            &downsampling_compute_pipeline.get_bind_group_layout(0),
+            &downsampling_bind_group_layout,
             &downsampling_textures,
             input_texture_view,
             &texture_sampler,
         );
+        let downsampling_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("downsampling pipeline layout"),
+            bind_group_layouts: &[
+
+            ]
+        })
+        let downsampling_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("scene Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &black_hole_shader,
+                entry_point: "vs_main",
+                buffers: &[Vertex::desc()],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &black_hole_shader,
+                entry_point: "fs_main",
+                targets: &[
+                    Some(wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                    Some(wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                ],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+        })
 
         Self {
             texture_sampler,
+
+            downsampling_bind_group_layout,
 
             downsampling_textures,
             downsampling_bind_groups,
@@ -89,9 +166,9 @@ impl Bloom {
     fn create_textures(
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
-    ) -> [(wgpu::Texture, wgpu::TextureView); MLC] {
+    ) -> Vec<(wgpu::Texture, wgpu::TextureView)> {
         // initialise the textures as a null array
-        let mut result: [(wgpu::Texture, wgpu::TextureView); MLC] = unsafe { mem::zeroed() };
+        let mut result = Vec::new();
         // track the dimensions of the current texture
         let mut dim = (config.width, config.height);
         // add all the texture to the array
@@ -107,7 +184,7 @@ impl Bloom {
                     height: dim.1,
                     depth_or_array_layers: 1,
                 },
-                format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                format: wgpu::TextureFormat::Rgba16Float,
                 dimension: wgpu::TextureDimension::D2,
                 usage: wgpu::TextureUsages::COPY_DST
                     | wgpu::TextureUsages::TEXTURE_BINDING
@@ -116,7 +193,7 @@ impl Bloom {
                 view_formats: &[],
             });
             let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-            result[level] = (texture, texture_view);
+            result.push((texture, texture_view));
         }
         result
     }
@@ -153,21 +230,21 @@ impl Bloom {
     fn create_bind_groups(
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,
-        textures: &[(wgpu::Texture, wgpu::TextureView); MLC],
+        textures: &Vec<(wgpu::Texture, wgpu::TextureView)>,
         input_texture_view: &wgpu::TextureView,
         texture_sampler: &wgpu::Sampler,
-    ) -> [wgpu::BindGroup; MLC] {
+    ) -> Vec<wgpu::BindGroup> {
         // initialise the bind groups as a null array
-        let mut result: [wgpu::BindGroup; MLC] = unsafe { mem::zeroed() };
+        let mut result = Vec::new();;
         // fist bind group processes the input texture into the first internal downsampling texture
-        result[0] = Self::create_bind_group(
+        result.push(Self::create_bind_group(
             device,
             Some(&format!("downsampling bind group {}", 0)),
             layout,
             input_texture_view,
             &textures[0].1,
             texture_sampler,
-        );
+        ));
         // add all the bind groups to the array
         for level in 1..MLC {
             // create the bind group
@@ -181,7 +258,7 @@ impl Bloom {
                 &textures[level].1,
                 texture_sampler,
             );
-            result[level] = bind_group;
+            result.push(bind_group);
         }
         result
     }
@@ -196,7 +273,7 @@ impl Bloom {
         self.downsampling_textures = Self::create_textures(device, config);
         self.downsampling_bind_groups = Self::create_bind_groups(
             device,
-            &self.downsampling_compute_pipeline.get_bind_group_layout(0),
+            &self.downsampling_bind_group_layout,
             &self.downsampling_textures,
             input_texture_view,
             &self.texture_sampler,

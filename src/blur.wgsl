@@ -147,9 +147,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let actual_col = map_col_one_to_infinity(textureLoad(t_diffuse, vec2<i32>(pixel_pos), 0).xyz);
     let blurred_col = my_textureBicubic(t_diffuse, pixel_pos, blur_size);
 
-    let col = actual_col + blurred_col * 0.5;
-    
-    return vec4<f32>(col, 1.0);
+    // let col = actual_col + blurred_col * 0.5;
+    // return vec4<f32>(col, 1.0);
+
+
+    let col = textureSampleLevel(t_diffuse, s_diffuse, in.uv, 0.0);
+    return col;
 }
 
 
