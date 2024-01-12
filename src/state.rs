@@ -153,7 +153,7 @@ impl State {
 
         // let blur = Blur::new(&device, &queue, &config, &scene.output_texture_view);
 
-        let bloom = Bloom::new(&device, &config, &scene.output_texture_view, &scene.blackout_output_texture_view);
+        let bloom = Bloom::new(&device, &config);
         // time stuff
 
         let last_frame_time = Instant::now();
@@ -274,12 +274,10 @@ impl State {
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
             self.scene.resize(&self.device, &self.queue, &self.config);
+            self.bloom.resize(&self.device, &self.config);
 
             // self.blur
             //     .resize(&self.device, &self.queue, &self.config, &self.scene.output_texture_view);
-            self.bloom.resize(&self.device, &self.config, &self.scene.output_texture_view, &self.scene.blackout_output_texture_view);
-            let (scene_texture, _postprocessing_input_bind_group_layout, postprocessing_input_bind_group) =
-                Self::create_scene_texture(&self.device, &self.config);
         }
     }
 
@@ -327,9 +325,15 @@ impl State {
             label: Some("scene Render Encoder"),
         });
 
-        self.scene.render(&mut encoder, None, None);
+        self.scene.render(
+            &mut encoder,
+            // Some(self.bloom.input_texture_view()),
+            Some(&output_view),
+            Some(self.bloom.blackout_input_texture_view()),
+            // None,
+        );
 
-        self.bloom.render(&mut encoder, Some(&output_view));
+        // self.bloom.render(&mut encoder, Some(&output_view));
 
         self.queue.submit(iter::once(encoder.finish()));
 

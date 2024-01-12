@@ -195,7 +195,8 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
     let x = (atan2(nrd.z, nrd.x) + TWO_PI * 0.5) / TWO_PI;
     let y = (-nrd.y + 1.0) * 0.5;
 
-    let col = tsw(t_diffuse, s_diffuse, vec2<f32>(x, y)).xyz;
+    // let col = tsw(t_diffuse, s_diffuse, vec2<f32>(x, y)).xyz;
+    let col = textureSampleLevel(t_diffuse, s_diffuse, vec2<f32>(x, y), 0.0).xyz;
     return col;
 }
 
