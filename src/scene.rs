@@ -44,22 +44,12 @@ pub struct Scene {
     pub index_buffer: wgpu::Buffer,
     pub num_indices: u32,
 
-    pub output_texture: wgpu::Texture,
-    pub output_texture_view: wgpu::TextureView,
-
-    pub blackout_output_texture: wgpu::Texture,
-    pub blackout_output_texture_view: wgpu::TextureView,
-
     pub resolution_uniform: UVec2,
     pub resolution_uniform_buffer: wgpu::Buffer,
 }
 
 impl Scene {
     pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, config: &wgpu::SurfaceConfiguration) -> Self {
-        let (output_texture, output_texture_view) = Self::create_output_texture(device, config,);
-
-        let (blackout_output_texture, blackout_output_texture_view) = Self::create_output_texture(device, config);
-
         let resolution_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             size: std::mem::size_of::<UVec2>() as wgpu::BufferAddress,
             label: Some("scene resolution_uniform_buffer"),
@@ -307,12 +297,6 @@ impl Scene {
             index_buffer,
             num_indices,
 
-            output_texture,
-            output_texture_view,
-
-            blackout_output_texture,
-            blackout_output_texture_view,
-            
             resolution_uniform,
             resolution_uniform_buffer,
         }
@@ -356,8 +340,6 @@ impl Scene {
         config: &wgpu::SurfaceConfiguration,
         // input_texture_view: &wgpu::TextureView,
     ) {
-        (self.output_texture, self.output_texture_view) = Self::create_output_texture(device, config);
-
         self.resolution_uniform = Self::create_resolution(queue, config, &self.resolution_uniform_buffer);
 
         self.camera.aspect = config.width as f32 / config.height as f32;
@@ -399,21 +381,18 @@ impl Scene {
         queue.write_buffer(&self.camera_uniform_buffer, 0, &data);
     }
 
-    pub fn render(&self, encoder: &mut wgpu::CommandEncoder, optional_output_view: Option<&wgpu::TextureView>, optional_blackout_output_view: Option<&wgpu::TextureView>) {
-        let output_view = match optional_output_view {
-            Some(output_view) => output_view,
-            None => &self.output_texture_view,
-        };
-
-        let blackout_output_view = match optional_blackout_output_view {
-            Some(output_view) => output_view,
-            None => &self.blackout_output_texture_view,
-        };
-
+    // renders the scene onto the given view(s)
+    // if none are given, then the render will have no output
+    pub fn render(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        output_view: Option<&wgpu::TextureView>,
+        blackout_output_view: Option<&wgpu::TextureView>,
+    ) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("scene render_pass"),
             color_attachments: &[
-                Some(wgpu::RenderPassColorAttachment {
+                output_view.map(|output_view| wgpu::RenderPassColorAttachment {
                     view: output_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
@@ -426,7 +405,7 @@ impl Scene {
                         store: wgpu::StoreOp::Store,
                     },
                 }),
-                Some(wgpu::RenderPassColorAttachment {
+                blackout_output_view.map(|blackout_output_view| wgpu::RenderPassColorAttachment {
                     view: blackout_output_view,
                     resolve_target: None,
                     ops: wgpu::Operations {

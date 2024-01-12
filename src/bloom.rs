@@ -36,7 +36,7 @@ pub struct Bloom {
     pub downsampling_texture_sampler: wgpu::Sampler,
     pub upsampling_texture_sampler: wgpu::Sampler,
 
-    pub sampling_textures: Vec<(wgpu::Texture, wgpu::TextureView)>,
+    pub textures: Vec<(wgpu::Texture, wgpu::TextureView)>,
 
     pub downsampling_bind_group_layout: wgpu::BindGroupLayout,
     pub downsampling_bind_groups: Vec<wgpu::BindGroup>,
@@ -50,9 +50,7 @@ pub struct Bloom {
 impl Bloom {
     pub fn new(
         device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
-        input_texture_view: &wgpu::TextureView,
-        blackout_input_texture_view: &wgpu::TextureView,
+        config: &wgpu::SurfaceConfiguration
     ) -> Self {
         let downsampling_texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -73,7 +71,7 @@ impl Bloom {
             ..Default::default()
         });
 
-        let sampling_textures = Self::create_textures(device, config);
+        let textures = Self::create_textures(device, config);
 
         let screen_triangle_shader_module = device.create_shader_module(include_wgsl!("screen_triangle.wgsl"));
         let downsample_shader_module = device.create_shader_module(include_wgsl!("downsample.wgsl"));
@@ -104,7 +102,7 @@ impl Bloom {
         let downsampling_bind_groups = Self::create_downsampling_bind_groups(
             device,
             &downsampling_bind_group_layout,
-            &sampling_textures,
+            &textures,
             blackout_input_texture_view,
             &downsampling_texture_sampler,
         );
@@ -191,7 +189,7 @@ impl Bloom {
         let upsampling_bind_groups = Self::create_upsampling_bind_groups(
             device,
             &upsampling_bind_group_layout,
-            &sampling_textures,
+            &textures,
             &input_texture_view,
             &upsampling_texture_sampler,
         );
@@ -241,7 +239,7 @@ impl Bloom {
             downsampling_texture_sampler,
             upsampling_texture_sampler,
 
-            sampling_textures,
+            textures,
 
             downsampling_bind_group_layout,
             downsampling_bind_groups,
@@ -251,6 +249,10 @@ impl Bloom {
             upsampling_bind_groups,
             upsampling_render_pipeline,
         }
+    }
+
+    fn input_texture_view(&self) -> wgpu::TextureView {
+        self.textures[0].1
     }
 
     // this creates all the levels of texture for downsampling
@@ -264,8 +266,6 @@ impl Bloom {
         let mut dim = (config.width, config.height);
         // add all the texture to the array
         for level in 0..MLC {
-            // ammend the dimension
-            dim = (dim.0 / 2, dim.1 / 2);
             // create the texture
             let texture = device.create_texture(&wgpu::TextureDescriptor {
                 label: Some(&format!("downsample texture {}", level)),
@@ -283,6 +283,8 @@ impl Bloom {
             });
             let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
             result.push((texture, texture_view));
+            // ammend the dimension
+            dim = (dim.0 / 2, dim.1 / 2);
         }
         result
     }
@@ -393,18 +395,18 @@ impl Bloom {
         input_texture_view: &wgpu::TextureView,
         blackout_input_texture_view: &wgpu::TextureView,
     ) {
-        self.sampling_textures = Self::create_textures(device, config);
+        self.textures = Self::create_textures(device, config);
         self.downsampling_bind_groups = Self::create_downsampling_bind_groups(
             device,
             &self.downsampling_bind_group_layout,
-            &self.sampling_textures,
+            &self.textures,
             blackout_input_texture_view,
             &self.downsampling_texture_sampler,
         );
         self.upsampling_bind_groups = Self::create_upsampling_bind_groups(
             device,
             &self.upsampling_bind_group_layout,
-            &self.sampling_textures,
+            &self.textures,
             input_texture_view,
             &self.upsampling_texture_sampler,
         );
@@ -452,7 +454,7 @@ impl Bloom {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("blur render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.sampling_textures[level].1,
+                    view: &self.textures[level].1,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -478,7 +480,7 @@ impl Bloom {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("blur render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.sampling_textures[level - 1].1,
+                    view: &self.textures[level - 1].1,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
