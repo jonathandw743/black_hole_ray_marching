@@ -174,7 +174,7 @@ impl State {
 
         // let blur = Blur::new(&device, &queue, &config, &scene.output_texture_view);
 
-        let bloom = Bloom::new(&device, &config, &scene.output_texture_view);
+        let bloom = Bloom::new(&device, &config, &scene.output_texture_view, &scene.blackout_output_texture_view);
         // let blur_1 = Blur::new(&device, &queue, &config, &blur_0.output_texture_view);
         // let blur_2 = Blur::new(&device, &queue, &config, &blur_1.output_texture_view);
         // let blur_3 = Blur::new(&device, &queue, &config, &blur_2.output_texture_view);
@@ -426,7 +426,7 @@ impl State {
 
             // self.blur
             //     .resize(&self.device, &self.queue, &self.config, &self.scene.output_texture_view);
-            self.bloom.resize(&self.device, &self.config, &self.scene.output_texture_view);
+            self.bloom.resize(&self.device, &self.config, &self.scene.output_texture_view, &self.scene.blackout_output_texture_view);
             // self.blur_1.resize(&self.device, &self.queue, &self.config, &self.blur_0.output_texture_view);
             // self.blur_2.resize(&self.device, &self.queue, &self.config, &self.blur_1.output_texture_view);
             // self.blur_3.resize(&self.device, &self.queue, &self.config, &self.blur_2.output_texture_view);

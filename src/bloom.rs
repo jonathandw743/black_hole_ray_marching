@@ -24,7 +24,7 @@ use cfg_if::cfg_if;
 
 use std::time::Duration;
 
-const MLC: usize = 6;
+const MLC: usize = 4;
 
 // #[repr(C)]
 // #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -52,6 +52,7 @@ impl Bloom {
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
         input_texture_view: &wgpu::TextureView,
+        blackout_input_texture_view: &wgpu::TextureView,
     ) -> Self {
         let downsampling_texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -104,7 +105,7 @@ impl Bloom {
             device,
             &downsampling_bind_group_layout,
             &sampling_textures,
-            input_texture_view,
+            blackout_input_texture_view,
             &downsampling_texture_sampler,
         );
 
@@ -168,13 +169,30 @@ impl Bloom {
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
             ],
         });
 
         let upsampling_bind_groups = Self::create_upsampling_bind_groups(
             device,
-            &downsampling_bind_group_layout,
+            &upsampling_bind_group_layout,
             &sampling_textures,
+            &input_texture_view,
             &upsampling_texture_sampler,
         );
 
@@ -269,7 +287,7 @@ impl Bloom {
         result
     }
 
-    fn create_bind_group(
+    fn create_downsampling_bind_group(
         device: &wgpu::Device,
         label: Option<&str>,
         layout: &wgpu::BindGroupLayout,
@@ -303,7 +321,7 @@ impl Bloom {
         // initialise the bind groups as a null array
         let mut result = Vec::new();
         // fist bind group processes the input texture into the first internal downsampling texture
-        result.push(Self::create_bind_group(
+        result.push(Self::create_downsampling_bind_group(
             device,
             Some(&format!("downsampling bind group {}", 0)),
             layout,
@@ -314,7 +332,7 @@ impl Bloom {
         for level in 1..MLC {
             // create the bind group
             // first binding is the texture to be read from in the shader
-            let bind_group = Self::create_bind_group(
+            let bind_group = Self::create_downsampling_bind_group(
                 device,
                 Some(&format!("downsampling bind group {}", 0)),
                 layout,
@@ -331,6 +349,7 @@ impl Bloom {
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,
         textures: &Vec<(wgpu::Texture, wgpu::TextureView)>,
+        base_texture_view: &wgpu::TextureView,
         texture_sampler: &wgpu::Sampler,
     ) -> Vec<wgpu::BindGroup> {
         // initialise the bind groups as a null array
@@ -339,13 +358,28 @@ impl Bloom {
         for level in 0..MLC {
             // create the bind group
             // first binding is the texture to be read from in the shader
-            let bind_group = Self::create_bind_group(
-                device,
-                Some(&format!("upsampling bind group {}", 0)),
+            let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some(&format!("upsampling bind group {}", level)),
                 layout,
-                &textures[level].1,
-                texture_sampler,
-            );
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&textures[level].1),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(texture_sampler),
+                    },
+                    wgpu:: BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::TextureView(base_texture_view)
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: wgpu::BindingResource::Sampler(texture_sampler),
+                    },
+                ],
+            });
             result.push(bind_group);
         }
         result
@@ -357,19 +391,21 @@ impl Bloom {
         // queue: &wgpu::Queue,
         config: &wgpu::SurfaceConfiguration,
         input_texture_view: &wgpu::TextureView,
+        blackout_input_texture_view: &wgpu::TextureView,
     ) {
         self.sampling_textures = Self::create_textures(device, config);
         self.downsampling_bind_groups = Self::create_downsampling_bind_groups(
             device,
             &self.downsampling_bind_group_layout,
             &self.sampling_textures,
-            input_texture_view,
+            blackout_input_texture_view,
             &self.downsampling_texture_sampler,
         );
         self.upsampling_bind_groups = Self::create_upsampling_bind_groups(
             device,
-            &self.downsampling_bind_group_layout,
+            &self.upsampling_bind_group_layout,
             &self.sampling_textures,
+            input_texture_view,
             &self.upsampling_texture_sampler,
         );
         // self.resolution_uniform = Self::create_resolution(queue, config, &self.resolution_uniform_buffer);

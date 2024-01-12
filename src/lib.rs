@@ -46,7 +46,7 @@ pub fn create_window() -> (Window, EventLoop<()>) {
 
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
-    window.set_inner_size(PhysicalSize::new(1000, 800));
+    window.set_inner_size(PhysicalSize::new(1280, 720));
     window.set_cursor_visible(true);
     // window.set_fullscreen(Some(winit::window::Fullscreen::Borderless(None)));
 
@@ -55,7 +55,7 @@ pub fn create_window() -> (Window, EventLoop<()>) {
         // Winit prevents sizing with CSS, so we have to set
         // the size manually when on web.
         use winit::dpi::PhysicalSize;
-        window.set_inner_size(PhysicalSize::new(1000, 800));
+        window.set_inner_size(PhysicalSize::new(1280, 720));
 
         use winit::platform::web::WindowExtWebSys;
         web_sys::window()
