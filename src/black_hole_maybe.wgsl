@@ -162,12 +162,12 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
 
         let dist_0 = get_dist(ro);
         if dist_0 < MIN_DIST {
-            return vec3<f32>(10.0);
+            return vec3<f32>(1.0);
         }
 
         let ps_dist = sdf_sphere(ro, -normalize(ray_origin) * 1.5 * u.RS, 0.075);
         if ps_dist < MIN_DIST {
-            return vec3<f32>(5.0, 5.0, 0.0);
+            return vec3<f32>(1.0, 1.0, 0.0);
         }
 
         let dist = min(dist_0, ps_dist);
@@ -217,10 +217,10 @@ struct FragmentOutput {
 fn fs_main(in: VertexOutput) -> FragmentOutput {
     let ray_dir = normalize(in.camera_to_vertex);
     let col = get_col(camera.pos.xyz, ray_dir);
-    let mapped_col = map_col_infinity_to_one(col);
-    var blackout_mapped_col = mapped_col;
+    // let mapped_col = map_col_infinity_to_one(col);
+    var blackout_col = col;
     if dot(col, col) < 1.0 {
-        blackout_mapped_col = vec3<f32>(0.0);
+        blackout_col = vec3<f32>(0.0);
     }
-    return FragmentOutput(vec4<f32>(mapped_col, 1.0), vec4<f32>(blackout_mapped_col, 1.0));
+    return FragmentOutput(vec4<f32>(col, 1.0), vec4<f32>(blackout_col, 1.0));
 }

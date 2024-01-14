@@ -328,12 +328,12 @@ impl State {
         self.scene.render(
             &mut encoder,
             // Some(self.bloom.input_texture_view()),
-            Some(&output_view),
+            Some(self.bloom.input_texture_view()),
             Some(self.bloom.blackout_input_texture_view()),
             // None,
         );
 
-        // self.bloom.render(&mut encoder, Some(&output_view));
+        self.bloom.render(&mut encoder, Some(&output_view));
 
         self.queue.submit(iter::once(encoder.finish()));
 
