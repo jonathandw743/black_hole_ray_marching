@@ -25,6 +25,8 @@ mod vertex;
 mod vertices;
 mod scene;
 mod blur;
+mod downsampling;
+mod upsampling;
 mod bloom;
 
 mod state;

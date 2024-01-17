@@ -352,7 +352,6 @@ impl Bloom {
             multiview: None,
         });
 
-
         Self {
             downsampling_texture_sampler,
             upsampling_texture_sampler,
@@ -384,7 +383,10 @@ impl Bloom {
         &self.input_texture_view
     }
 
-    fn create_input_texture(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) -> (wgpu::Texture, wgpu::TextureView) {
+    fn create_input_texture(
+        device: &wgpu::Device,
+        config: &wgpu::SurfaceConfiguration,
+    ) -> (wgpu::Texture, wgpu::TextureView) {
         let input_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("bloom input texture"),
             mip_level_count: 1,
@@ -550,11 +552,7 @@ impl Bloom {
         bind_group
     }
 
-    pub fn resize(
-        &mut self,
-        device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
-    ) {
+    pub fn resize(&mut self, device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) {
         (self.input_texture, self.input_texture_view) = Self::create_input_texture(device, config);
         self.textures = Self::create_textures(device, config);
         self.downsampling_bind_groups = Self::create_downsampling_bind_groups(
@@ -579,7 +577,6 @@ impl Bloom {
     }
 
     pub fn render(&self, encoder: &mut wgpu::CommandEncoder, output_view: Option<&wgpu::TextureView>) {
-
         for level in 0..MLC - 1 {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("blur render pass"),
@@ -633,21 +630,19 @@ impl Bloom {
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("blur render pass"),
-                color_attachments: &[
-                    output_view.map(|output_view| wgpu::RenderPassColorAttachment {
-                        view: output_view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color {
-                                r: 0.0,
-                                g: 0.0,
-                                b: 1.0,
-                                a: 1.0,
-                            }),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })
-                ],
+                color_attachments: &[output_view.map(|output_view| wgpu::RenderPassColorAttachment {
+                    view: output_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 1.0,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,
