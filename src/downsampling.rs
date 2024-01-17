@@ -120,7 +120,7 @@ impl<const Levels: usize> Downsampling<Levels> {
         // track the dimensions of the current texture
         let mut dim = (config.width, config.height);
         // add all the texture to the array
-        for level in 0..Levels + 1 {
+        for level in 0..Levels {
             // create the texture
             let texture = device.create_texture(&wgpu::TextureDescriptor {
                 label: Some(&format!("downsample texture {}", level)),
@@ -187,11 +187,11 @@ impl<const Levels: usize> Downsampling<Levels> {
     }
 
     pub fn render(&self, encoder: &mut wgpu::CommandEncoder, output_view: Option<&wgpu::TextureView>) {
-        for level in 0..Levels {
+        for level in 1..Levels {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("blur render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.textures[level + 1].1,
+                    view: &self.textures[level].1,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -208,7 +208,32 @@ impl<const Levels: usize> Downsampling<Levels> {
                 occlusion_query_set: None,
             });
             render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.bind_groups[level], &[]);
+            render_pass.set_bind_group(0, &self.bind_groups[level - 1], &[]);
+            render_pass.draw(0..3, 0..1);
+        }
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("blur render pass"),
+                color_attachments: &[output_view.map(|output_view| wgpu::RenderPassColorAttachment {
+                    view: output_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 1.0,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.bind_groups[Levels - 1], &[]);
             render_pass.draw(0..3, 0..1);
         }
     }

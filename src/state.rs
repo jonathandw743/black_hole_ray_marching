@@ -1,52 +1,20 @@
-use std::f32::consts::PI;
-
 use std::iter;
 
 use wgpu::{InstanceFlags, SurfaceConfiguration};
 use winit::dpi::PhysicalPosition;
-// use cgmath::num_traits::float;
 use winit::{event::*, window::Window};
-
-use glam::{vec2, Vec3};
 
 use crate::bloom::Bloom;
 use std::thread::sleep;
-// use std::time::{Duration, Instant};
+//// use std::time::{Duration, Instant};
 use crate::time_replacement::{Duration, Instant};
-
-use wgpu::util::DeviceExt;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-// mod texture;
-use crate::texture::Texture;
-
-// mod settings;
 use crate::settings::{Settings, SettingsController};
 
-use crate::uniforms::CameraUniform;
-
-// mod camera;
-use crate::camera::{Camera, CameraController};
-
-// mod vertex;
-use crate::vertex::{PostProcessingVertex, Vertex};
-
-// mod vertices;
-use crate::vertices::{POSTPROCESSING_VERTICES, VERTICES};
-
-// // mod indices;
-use crate::indices::INDICES;
-
-use crate::otheruniforms::*;
-use crate::uniformscontroller::*;
-
-use crate::podbool::*;
-
 use crate::scene::Scene;
-
-use crate::blur::Blur;
 
 pub struct State {
     // wgpu and winit setup
@@ -62,7 +30,7 @@ pub struct State {
 
     pub scene: Scene,
     // pub blur: Blur,
-    pub bloom: Bloom,
+    pub bloom: Bloom<4>,
 
     // timing
     pub start_of_last_frame_instant: Instant,
@@ -329,6 +297,7 @@ impl State {
             &mut encoder,
             // Some(self.bloom.input_texture_view()),
             Some(self.bloom.input_texture_view()),
+            // Some(&output_view),
             Some(self.bloom.blackout_input_texture_view()),
             // None,
         );

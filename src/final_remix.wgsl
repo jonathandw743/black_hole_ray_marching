@@ -16,18 +16,13 @@ var original_texture_sampler: sampler;
 var blackout_texture: texture_2d<f32>;
 @group(0) @binding(3)
 var blackout_texture_sampler: sampler;
-@group(0) @binding(4)
-var original_blackout_texture: texture_2d<f32>;
-@group(0) @binding(5)
-var original_blackout_texture_sampler: sampler;
 
 @fragment
 fn main(in: VertexOutput) -> @location(0) vec4<f32> {
     // let col_from_prev_texture = textureSampleLevel(prev_texture, prev_texture_sampler, in.texcoord, 0.0);
     let col_from_original_texture = textureSampleLevel(original_texture, original_texture_sampler, in.texcoord, 0.0);
-    let col_from_blackout_texture = textureBicubic(blackout_texture, blackout_texture_sampler, in.texcoord);
-    let col_from_original_blackout_texture = textureSampleLevel(original_blackout_texture, original_blackout_texture_sampler, in.texcoord, 0.0);
-    let col = col_from_original_texture + col_from_blackout_texture + col_from_original_blackout_texture;
+    let col_from_blackout_texture = textureSampleLevel(blackout_texture, blackout_texture_sampler, in.texcoord, 0.0);
+    let col = col_from_original_texture + col_from_blackout_texture;
     return col;
 }
 
