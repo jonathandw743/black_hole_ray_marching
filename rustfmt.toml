@@ -1,7 +1,0 @@
-# rustfmt.toml
-
-# Use trailing commas where applicable
-trailing_comma = "Always"
-
-# Specify maximum line length
-max_width = 120
