@@ -82,11 +82,12 @@ impl Blur {
 
         let blur_size_uniform = 2.0;
 
-        let blur_size_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("blur blur size uniform buffer"),
-            contents: &bytemuck::cast_slice(&[blur_size_uniform]),
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
-        });
+        let blur_size_uniform_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("blur blur size uniform buffer"),
+                contents: &bytemuck::cast_slice(&[blur_size_uniform]),
+                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
+            });
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
@@ -139,11 +140,12 @@ impl Blur {
             &blur_size_uniform_buffer,
         );
 
-        let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("scene Pipeline Layout"),
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
-        });
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("scene Pipeline Layout"),
+                bind_group_layouts: &[&bind_group_layout],
+                push_constant_ranges: &[],
+            });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("scene Pipeline"),
@@ -204,7 +206,11 @@ impl Blur {
         }
     }
 
-    pub fn create_resolution(queue: &wgpu::Queue, config: &wgpu::SurfaceConfiguration, buffer: &wgpu::Buffer) -> UVec2 {
+    pub fn create_resolution(
+        queue: &wgpu::Queue,
+        config: &wgpu::SurfaceConfiguration,
+        buffer: &wgpu::Buffer,
+    ) -> UVec2 {
         let resolution_uniform = uvec2(config.width, config.height);
         queue.write_buffer(buffer, 0, &resolution_uniform.uniform_buffer_content());
         return resolution_uniform;
@@ -263,7 +269,8 @@ impl Blur {
             view_formats: &[],
         });
 
-        let output_texture_view = output_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let output_texture_view =
+            output_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         return (output_texture, output_texture_view);
     }
@@ -276,9 +283,12 @@ impl Blur {
         config: &wgpu::SurfaceConfiguration,
         input_texture_view: &wgpu::TextureView,
     ) {
-        (self.output_texture, self.output_texture_view) = Self::create_output_texture(device, config);
+        let x = 3.0;
+        (self.output_texture, self.output_texture_view) =
+            Self::create_output_texture(device, config);
 
-        self.resolution_uniform = Self::create_resolution(queue, config, &self.resolution_uniform_buffer);
+        self.resolution_uniform =
+            Self::create_resolution(queue, config, &self.resolution_uniform_buffer);
 
         self.bind_group = Self::create_bind_group(
             device,
@@ -290,7 +300,11 @@ impl Blur {
         );
     }
 
-    pub fn render(&self, encoder: &mut wgpu::CommandEncoder, optional_output_view: Option<&wgpu::TextureView>) {
+    pub fn render(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        optional_output_view: Option<&wgpu::TextureView>,
+    ) {
         let output_view = match optional_output_view {
             Some(output_view) => output_view,
             None => &self.output_texture_view,

@@ -1,4 +1,4 @@
-pub struct Downsampling<const Levels: usize> {
+pub struct Downsampling<const LEVELS: usize> {
     pub texture_sampler: wgpu::Sampler,
 
     pub textures: Vec<(wgpu::Texture, wgpu::TextureView)>,
@@ -8,7 +8,7 @@ pub struct Downsampling<const Levels: usize> {
     pub render_pipeline: wgpu::RenderPipeline,
 }
 
-impl<const Levels: usize> Downsampling<Levels> {
+impl<const LEVELS: usize> Downsampling<LEVELS> {
     pub fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) -> Self {
         let downsampling_texture_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -22,30 +22,33 @@ impl<const Levels: usize> Downsampling<Levels> {
 
         let textures = Self::create_textures(device, config);
 
-        let screen_triangle_shader_module = device.create_shader_module(wgpu::include_wgsl!("screen_triangle.wgsl"));
-        let downsample_shader_module = device.create_shader_module(wgpu::include_wgsl!("downsample.wgsl"));
+        let screen_triangle_shader_module =
+            device.create_shader_module(wgpu::include_wgsl!("screen_triangle.wgsl"));
+        let downsample_shader_module =
+            device.create_shader_module(wgpu::include_wgsl!("downsample.wgsl"));
 
-        let downsampling_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("downsampling bind group layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+        let downsampling_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("downsampling bind group layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-        });
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
 
         let downsampling_bind_groups = Self::create_bind_groups(
             device,
@@ -54,46 +57,48 @@ impl<const Levels: usize> Downsampling<Levels> {
             &downsampling_texture_sampler,
         );
 
-        let downsampling_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("downsampling pipeline layout"),
-            bind_group_layouts: &[&downsampling_bind_group_layout],
-            push_constant_ranges: &[],
-        });
+        let downsampling_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("downsampling pipeline layout"),
+                bind_group_layouts: &[&downsampling_bind_group_layout],
+                push_constant_ranges: &[],
+            });
 
-        let downsampling_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("scene Pipeline"),
-            layout: Some(&downsampling_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &screen_triangle_shader_module,
-                entry_point: "main",
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &downsample_shader_module,
-                entry_point: "main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-        });
+        let downsampling_render_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("scene Pipeline"),
+                layout: Some(&downsampling_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &screen_triangle_shader_module,
+                    entry_point: "main",
+                    buffers: &[],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &downsample_shader_module,
+                    entry_point: "main",
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: Some(wgpu::Face::Back),
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview: None,
+            });
 
         Self {
             texture_sampler: downsampling_texture_sampler,
@@ -120,7 +125,7 @@ impl<const Levels: usize> Downsampling<Levels> {
         // track the dimensions of the current texture
         let mut dim = (config.width, config.height);
         // add all the texture to the array
-        for level in 0..Levels {
+        for level in 0..LEVELS {
             // create the texture
             let texture = device.create_texture(&wgpu::TextureDescriptor {
                 label: Some(&format!("downsample texture {}", level)),
@@ -132,7 +137,8 @@ impl<const Levels: usize> Downsampling<Levels> {
                 },
                 format: wgpu::TextureFormat::Bgra8UnormSrgb,
                 dimension: wgpu::TextureDimension::D2,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
                 sample_count: 1,
                 view_formats: &[],
             });
@@ -154,7 +160,7 @@ impl<const Levels: usize> Downsampling<Levels> {
         // initialise the bind groups as a null array
         let mut result = Vec::new();
         // add all the bind groups to the array
-        for level in 0..Levels {
+        for level in 0..LEVELS {
             // create the bind group
             // first binding is the texture to be read from in the shader
             let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -186,8 +192,12 @@ impl<const Levels: usize> Downsampling<Levels> {
         );
     }
 
-    pub fn render(&self, encoder: &mut wgpu::CommandEncoder, output_view: Option<&wgpu::TextureView>) {
-        for level in 1..Levels {
+    pub fn render(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        output_view: Option<&wgpu::TextureView>,
+    ) {
+        for level in 1..LEVELS {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("blur render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -215,25 +225,27 @@ impl<const Levels: usize> Downsampling<Levels> {
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("blur render pass"),
-                color_attachments: &[output_view.map(|output_view| wgpu::RenderPassColorAttachment {
-                    view: output_view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 1.0,
-                            a: 1.0,
-                        }),
-                        store: wgpu::StoreOp::Store,
-                    },
+                color_attachments: &[output_view.map(|output_view| {
+                    wgpu::RenderPassColorAttachment {
+                        view: output_view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color {
+                                r: 0.0,
+                                g: 0.0,
+                                b: 1.0,
+                                a: 1.0,
+                            }),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }
                 })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
             render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.bind_groups[Levels - 1], &[]);
+            render_pass.set_bind_group(0, &self.bind_groups[LEVELS - 1], &[]);
             render_pass.draw(0..3, 0..1);
         }
     }

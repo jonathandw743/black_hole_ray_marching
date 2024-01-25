@@ -1,4 +1,4 @@
-pub struct Upsampling<const Levels: usize> {
+pub struct Upsampling<const LEVELS: usize> {
     pub texture_sampler: wgpu::Sampler,
 
     pub textures: Vec<(wgpu::Texture, wgpu::TextureView)>,
@@ -7,7 +7,7 @@ pub struct Upsampling<const Levels: usize> {
     pub render_pipeline: wgpu::RenderPipeline,
 }
 
-impl<const Levels: usize> Upsampling<Levels> {
+impl<const LEVELS: usize> Upsampling<LEVELS> {
     pub fn new(
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
@@ -24,8 +24,10 @@ impl<const Levels: usize> Upsampling<Levels> {
         });
         let textures = Self::create_textures(device, config);
 
-        let screen_triangle_shader_module = device.create_shader_module(wgpu::include_wgsl!("screen_triangle.wgsl"));
-        let upsample_shader_module = device.create_shader_module(wgpu::include_wgsl!("upsample.wgsl"));
+        let screen_triangle_shader_module =
+            device.create_shader_module(wgpu::include_wgsl!("screen_triangle.wgsl"));
+        let upsample_shader_module =
+            device.create_shader_module(wgpu::include_wgsl!("upsample.wgsl"));
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("upsampling bind group layout"),
@@ -126,7 +128,7 @@ impl<const Levels: usize> Upsampling<Levels> {
     }
 
     pub fn input_texture_view(&self) -> &wgpu::TextureView {
-        &self.textures[Levels - 1].1
+        &self.textures[LEVELS - 1].1
     }
 
     // this creates all the levels of texture for downsampling
@@ -139,7 +141,7 @@ impl<const Levels: usize> Upsampling<Levels> {
         // track the dimensions of the current texture
         let mut dim = (config.width, config.height);
         // add all the texture to the array
-        for level in 0..Levels {
+        for level in 0..LEVELS {
             // ammend the dimension
             dim = (dim.0 / 2, dim.1 / 2);
             // create the texture
@@ -153,7 +155,8 @@ impl<const Levels: usize> Upsampling<Levels> {
                 },
                 format: wgpu::TextureFormat::Bgra8UnormSrgb,
                 dimension: wgpu::TextureDimension::D2,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
                 sample_count: 1,
                 view_formats: &[],
             });
@@ -174,7 +177,7 @@ impl<const Levels: usize> Upsampling<Levels> {
         // initialise the bind groups as a null array
         let mut result = Vec::new();
         // add all the bind groups to the array
-        for level in 0..Levels {
+        for level in 0..LEVELS {
             // create the bind group
             // first binding is the texture to be read from in the shader
             let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -183,7 +186,9 @@ impl<const Levels: usize> Upsampling<Levels> {
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&textures[Levels - level - 1].1),
+                        resource: wgpu::BindingResource::TextureView(
+                            &textures[LEVELS - level - 1].1,
+                        ),
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
@@ -191,7 +196,9 @@ impl<const Levels: usize> Upsampling<Levels> {
                     },
                     wgpu::BindGroupEntry {
                         binding: 2,
-                        resource: wgpu::BindingResource::TextureView(&original_textures[Levels - level - 1].1),
+                        resource: wgpu::BindingResource::TextureView(
+                            &original_textures[LEVELS - level - 1].1,
+                        ),
                     },
                     wgpu::BindGroupEntry {
                         binding: 3,
@@ -220,12 +227,16 @@ impl<const Levels: usize> Upsampling<Levels> {
         );
     }
 
-    pub fn render(&self, encoder: &mut wgpu::CommandEncoder, output_view: Option<&wgpu::TextureView>) {
-        for level in 0..Levels - 1 {
+    pub fn render(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        output_view: Option<&wgpu::TextureView>,
+    ) {
+        for level in 0..LEVELS - 1 {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("blur render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.textures[Levels - level - 2].1,
+                    view: &self.textures[LEVELS - level - 2].1,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -248,25 +259,27 @@ impl<const Levels: usize> Upsampling<Levels> {
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("blur render pass"),
-                color_attachments: &[output_view.map(|output_view| wgpu::RenderPassColorAttachment {
-                    view: output_view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 1.0,
-                            a: 1.0,
-                        }),
-                        store: wgpu::StoreOp::Store,
-                    },
+                color_attachments: &[output_view.map(|output_view| {
+                    wgpu::RenderPassColorAttachment {
+                        view: output_view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color {
+                                r: 0.0,
+                                g: 0.0,
+                                b: 1.0,
+                                a: 1.0,
+                            }),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }
                 })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
             render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.bind_groups[Levels - 1], &[]);
+            render_pass.set_bind_group(0, &self.bind_groups[LEVELS - 1], &[]);
             render_pass.draw(0..3, 0..1);
         }
     }

@@ -1,15 +1,15 @@
 use crate::downsampling::Downsampling;
 use crate::upsampling::Upsampling;
 
-pub struct Bloom<const Levels: usize> {
+pub struct Bloom<const LEVELS: usize> {
     pub input_texture: wgpu::Texture,
     pub input_texture_view: wgpu::TextureView,
 
     pub blackout_input_texture: wgpu::Texture,
     pub blackout_input_texture_view: wgpu::TextureView,
 
-    pub downsampling: Downsampling<Levels>,
-    pub upsampling: Upsampling<Levels>,
+    pub downsampling: Downsampling<LEVELS>,
+    pub upsampling: Upsampling<LEVELS>,
 
     pub final_remix_texture_sampler: wgpu::Sampler,
 
@@ -18,7 +18,7 @@ pub struct Bloom<const Levels: usize> {
     pub final_remix_render_pipeline: wgpu::RenderPipeline,
 }
 
-impl<const Levels: usize> Bloom<Levels> {
+impl<const LEVELS: usize> Bloom<LEVELS> {
     pub fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) -> Self {
         let (input_texture, input_texture_view) = Self::create_input_texture(device, config);
 
@@ -34,48 +34,52 @@ impl<const Levels: usize> Bloom<Levels> {
             ..Default::default()
         });
 
-        let (blackout_input_texture, blackout_input_texture_view) = Self::create_input_texture(device, config);
+        let (blackout_input_texture, blackout_input_texture_view) =
+            Self::create_input_texture(device, config);
 
-        let screen_triangle_shader_module = device.create_shader_module(wgpu::include_wgsl!("screen_triangle.wgsl"));
-        let final_remix_shader_module = device.create_shader_module(wgpu::include_wgsl!("final_remix.wgsl"));
+        let screen_triangle_shader_module =
+            device.create_shader_module(wgpu::include_wgsl!("screen_triangle.wgsl"));
+        let final_remix_shader_module =
+            device.create_shader_module(wgpu::include_wgsl!("final_remix.wgsl"));
 
-        let final_remix_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("final remix upsampling bind group layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+        let final_remix_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("final remix upsampling bind group layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-        });
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
 
         let final_remix_bind_group = Self::create_final_remix_bind_group(
             device,
@@ -85,46 +89,48 @@ impl<const Levels: usize> Bloom<Levels> {
             &final_remix_texture_sampler,
         );
 
-        let final_remix_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("upsampling pipeline layout"),
-            bind_group_layouts: &[&final_remix_bind_group_layout],
-            push_constant_ranges: &[],
-        });
+        let final_remix_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("upsampling pipeline layout"),
+                bind_group_layouts: &[&final_remix_bind_group_layout],
+                push_constant_ranges: &[],
+            });
 
-        let final_remix_render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("scene Pipeline"),
-            layout: Some(&final_remix_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &screen_triangle_shader_module,
-                entry_point: "main",
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &final_remix_shader_module,
-                entry_point: "main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-        });
+        let final_remix_render_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("scene Pipeline"),
+                layout: Some(&final_remix_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &screen_triangle_shader_module,
+                    entry_point: "main",
+                    buffers: &[],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &final_remix_shader_module,
+                    entry_point: "main",
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: Some(wgpu::Face::Back),
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview: None,
+            });
 
         Self {
             input_texture,
@@ -151,7 +157,6 @@ impl<const Levels: usize> Bloom<Levels> {
     pub fn blackout_input_texture_view(&self) -> &wgpu::TextureView {
         &self.downsampling.input_texture_view()
     }
-
 
     fn create_input_texture(
         device: &wgpu::Device,
@@ -210,9 +215,13 @@ impl<const Levels: usize> Bloom<Levels> {
 
     pub fn resize(&mut self, device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) {
         (self.input_texture, self.input_texture_view) = Self::create_input_texture(device, config);
-        (self.blackout_input_texture, self.blackout_input_texture_view) = Self::create_input_texture(device, config);
+        (
+            self.blackout_input_texture,
+            self.blackout_input_texture_view,
+        ) = Self::create_input_texture(device, config);
         self.downsampling.resize(device, config);
-        self.upsampling.resize(device, config, &self.downsampling.textures);
+        self.upsampling
+            .resize(device, config, &self.downsampling.textures);
         self.final_remix_bind_group = Self::create_final_remix_bind_group(
             device,
             &self.final_remix_bind_group_layout,
@@ -222,24 +231,32 @@ impl<const Levels: usize> Bloom<Levels> {
         );
     }
 
-    pub fn render(&self, encoder: &mut wgpu::CommandEncoder, output_view: Option<&wgpu::TextureView>) {
-        self.downsampling.render(encoder, Some(self.upsampling.input_texture_view()));
-        self.upsampling.render(encoder, Some(&self.blackout_input_texture_view));
+    pub fn render(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        output_view: Option<&wgpu::TextureView>,
+    ) {
+        self.downsampling
+            .render(encoder, Some(self.upsampling.input_texture_view()));
+        self.upsampling
+            .render(encoder, Some(&self.blackout_input_texture_view));
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("blur render pass"),
-                color_attachments: &[output_view.map(|output_view| wgpu::RenderPassColorAttachment {
-                    view: output_view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 1.0,
-                            a: 1.0,
-                        }),
-                        store: wgpu::StoreOp::Store,
-                    },
+                color_attachments: &[output_view.map(|output_view| {
+                    wgpu::RenderPassColorAttachment {
+                        view: output_view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color {
+                                r: 0.0,
+                                g: 0.0,
+                                b: 1.0,
+                                a: 1.0,
+                            }),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }
                 })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,

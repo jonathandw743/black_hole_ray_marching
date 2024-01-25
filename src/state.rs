@@ -1,4 +1,4 @@
-use std::iter;
+use std::{default, iter};
 
 use wgpu::InstanceFlags;
 use winit::dpi::PhysicalPosition;
