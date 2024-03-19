@@ -1,5 +1,7 @@
 # Black Hole Ray Marching
 
+git test
+
 Using rust and WGPU (wgpu-rs), and wgsl shaders.
 
 Use `cargo run` to start.
