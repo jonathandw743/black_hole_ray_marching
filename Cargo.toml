@@ -19,7 +19,6 @@ wgpu = "0.18"
 pollster = "0.2"
 bytemuck = { version = "1.12", features = [ "derive" ] }
 anyhow = "1.0"
-# cgmath = "0.18"
 aligned = "0.4.1"
 encase = { version = "0.6.1", features = ["glam"] }
 glam = "0.24.2"
