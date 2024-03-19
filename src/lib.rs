@@ -3,7 +3,7 @@ use winit::{
     dpi::PhysicalSize,
     event::*,
     event_loop::{ControlFlow, EventLoop},
-    window::{Window, WindowBuilder}, monitor::{VideoMode, MonitorHandle},
+    window::{Window, WindowBuilder},
 };
 
 #[cfg(target_arch = "wasm32")]
@@ -12,29 +12,24 @@ use wasm_bindgen::prelude::*;
 #[macro_use]
 mod smart_include;
 
+mod bloom;
 mod camera;
+mod downsampling;
 mod indices;
 mod otheruniforms;
 mod podbool;
+mod scene;
 mod settings;
 mod texture;
 mod time_replacement;
 mod uniforms;
 mod uniformscontroller;
+mod upsampling;
 mod vertex;
 mod vertices;
-mod scene;
-mod blur;
-mod downsampling;
-mod upsampling;
-mod bloom;
 
 mod state;
 use state::State;
-
-
-
-
 
 pub fn create_window() -> (Window, EventLoop<()>) {
     cfg_if! {
@@ -83,7 +78,10 @@ pub async fn run() {
 
     event_loop.run(move |event, _, control_flow| {
         match event {
-            Event::WindowEvent { ref event, window_id } if window_id == state.window().id() => {
+            Event::WindowEvent {
+                ref event,
+                window_id,
+            } if window_id == state.window().id() => {
                 // only do all these window inputs if the state hasn't already done something with the input
                 if !state.input(event) {
                     // UPDATED!
@@ -115,7 +113,9 @@ pub async fn run() {
                 match state.render() {
                     Ok(_) => {}
                     // Reconfigure the surface if it's lost or outdated
-                    Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => state.resize(state.size),
+                    Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                        state.resize(state.size)
+                    }
                     // The system is out of memory, we should probably quit
                     Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
 

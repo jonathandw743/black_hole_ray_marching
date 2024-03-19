@@ -16,6 +16,12 @@ var texture_sampler: sampler;
 @fragment
 fn main(in: VertexOutput) -> @location(0) vec4<f32> {
     let col = textureSampleLevel(input_texture, texture_sampler, in.texcoord, 0.0);
+    //let col2 = textureSampleLevel(input_texture, texture_sampler, in.texcoord, 0.0);
+    //let col3 = textureSampleLevel(input_texture, texture_sampler, in.texcoord, 0.0);
+    //let col4 = textureSampleLevel(input_texture, texture_sampler, in.texcoord, 0.0);
+    //let col5 = textureSampleLevel(input_texture, texture_sampler, in.texcoord, 0.0);
+    //let col6 = textureSampleLevel(input_texture, texture_sampler, in.texcoord, 0.0);
+    //let col7 = textureSampleLevel(input_texture, texture_sampler, in.texcoord, 0.0);
     // let col = textureBicubic(input_texture, texture_sampler, in.texcoord);
     return col;
 }

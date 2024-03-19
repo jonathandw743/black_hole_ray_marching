@@ -21,9 +21,9 @@ var original_blackout_texture_sampler: sampler;
 fn main(in: VertexOutput) -> @location(0) vec4<f32> {
     // let col_from_prev_texture = textureSampleLevel(prev_texture, prev_texture_sampler, in.texcoord, 0.0);
     let col_from_prev_texture = textureBicubic(prev_texture, prev_texture_sampler, in.texcoord);
-    let col_from_original_blackout_texture = textureSampleLevel(original_blackout_texture, original_blackout_texture_sampler, in.texcoord, 0.0);
+    // let col_from_original_blackout_texture = textureSampleLevel(original_blackout_texture, original_blackout_texture_sampler, in.texcoord, 0.0);
     // let col = mix(col_from_prev_texture, col_from_original_blackout_texture, 0.05);
-    let col = col_from_prev_texture + col_from_original_blackout_texture;
+    let col = col_from_prev_texture;// + col_from_original_blackout_texture;
     return col;
 }
 

@@ -1,13 +1,13 @@
-use std::{default, iter};
-
+use std::iter;
 use wgpu::InstanceFlags;
 use winit::dpi::PhysicalPosition;
 use winit::{event::*, window::Window};
 
 use crate::bloom::Bloom;
-use std::thread::sleep;
-//// use std::time::{Duration, Instant};
+use crate::downsampling::{self, Downsampling};
 use crate::time_replacement::{Duration, Instant};
+use crate::upsampling::Upsampling;
+use std::thread::sleep;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
@@ -31,6 +31,8 @@ pub struct State {
     pub scene: Scene,
     // pub blur: Blur,
     pub bloom: Bloom<5>,
+    pub downsampling: Downsampling<5>,
+    pub upsampling: Upsampling<5>,
 
     // timing
     pub start_of_last_frame_instant: Instant,
@@ -45,6 +47,7 @@ pub struct State {
 impl State {
     pub async fn new(window: Window) -> Self {
         let size = window.inner_size();
+        let x = 3.0;
 
         // The instance is a handle to our GPU
         // BackendBit::PRIMARY => Vulkan + Metal + DX12 + Browser WebGPU
@@ -123,6 +126,8 @@ impl State {
 
         let bloom = Bloom::new(&device, &config);
 
+        let downsampling = Downsampling::new(&device, &config);
+        let upsampling = Upsampling::new(&device, &config, &downsampling.textures);
         // time stuff
 
         let last_frame_time = Instant::now();
@@ -144,6 +149,8 @@ impl State {
 
             // blur,
             bloom,
+            downsampling,
+            upsampling,
             start_of_last_frame_instant: last_frame_time,
             delta_time,
 
@@ -153,84 +160,6 @@ impl State {
             frame_number: 0,
         }
     }
-
-    // pub fn create_scene_texture(
-    //     device: &wgpu::Device,
-    //     config: &SurfaceConfiguration,
-    // ) -> (wgpu::Texture, wgpu::BindGroupLayout, wgpu::BindGroup) {
-    //     let scene_texture = device.create_texture(&wgpu::TextureDescriptor {
-    //         label: Some("Scene Texture"),
-    //         size: wgpu::Extent3d {
-    //             width: config.width,
-    //             height: config.height,
-    //             depth_or_array_layers: 1,
-    //         },
-    //         mip_level_count: 1,
-    //         sample_count: 1,
-    //         dimension: wgpu::TextureDimension::D2,
-    //         format: wgpu::TextureFormat::Bgra8UnormSrgb,
-    //         usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-    //             | wgpu::TextureUsages::TEXTURE_BINDING
-    //             | wgpu::TextureUsages::COPY_SRC,
-    //         view_formats: &[],
-    //     });
-    //
-    //     let postprocessing_input_bind_group_layout =
-    //         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-    //             entries: &[
-    //                 wgpu::BindGroupLayoutEntry {
-    //                     binding: 0,
-    //                     visibility: wgpu::ShaderStages::FRAGMENT,
-    //                     ty: wgpu::BindingType::Texture {
-    //                         multisampled: false,
-    //                         view_dimension: wgpu::TextureViewDimension::D2,
-    //                         sample_type: wgpu::TextureSampleType::Float { filterable: true },
-    //                     },
-    //                     count: None,
-    //                 },
-    //                 wgpu::BindGroupLayoutEntry {
-    //                     binding: 1,
-    //                     visibility: wgpu::ShaderStages::FRAGMENT,
-    //                     // This should match the filterable field of the
-    //                     // corresponding Texture entry above.
-    //                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
-    //                     count: None,
-    //                 },
-    //             ],
-    //             label: Some("postprocessing_input_bind_group_layout"),
-    //         });
-    //
-    //     let postprocessing_input_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-    //         layout: &postprocessing_input_bind_group_layout,
-    //         entries: &[
-    //             wgpu::BindGroupEntry {
-    //                 binding: 0,
-    //                 resource: wgpu::BindingResource::TextureView(
-    //                     &scene_texture.create_view(&wgpu::TextureViewDescriptor::default()),
-    //                 ), // CHANGED!
-    //             },
-    //             wgpu::BindGroupEntry {
-    //                 binding: 1,
-    //                 resource: wgpu::BindingResource::Sampler(&device.create_sampler(&wgpu::SamplerDescriptor {
-    //                     address_mode_u: wgpu::AddressMode::ClampToEdge,
-    //                     address_mode_v: wgpu::AddressMode::ClampToEdge,
-    //                     address_mode_w: wgpu::AddressMode::ClampToEdge,
-    //                     mag_filter: wgpu::FilterMode::Nearest,
-    //                     min_filter: wgpu::FilterMode::Nearest,
-    //                     mipmap_filter: wgpu::FilterMode::Nearest,
-    //                     ..Default::default()
-    //                 })), // CHANGED!
-    //             },
-    //         ],
-    //         label: Some("postprocessing_input_bind_group"),
-    //     });
-    //
-    //     return (
-    //         scene_texture,
-    //         postprocessing_input_bind_group_layout,
-    //         postprocessing_input_bind_group,
-    //     );
-    // }
 
     pub fn window(&self) -> &Window {
         &self.window
@@ -244,9 +173,8 @@ impl State {
             self.surface.configure(&self.device, &self.config);
             self.scene.resize(&self.device, &self.queue, &self.config);
             self.bloom.resize(&self.device, &self.config);
-
-            // self.blur
-            //     .resize(&self.device, &self.queue, &self.config, &self.scene.output_texture_view);
+            self.downsampling.resize(&self.device, &self.config);
+            self.downsampling.resize(&self.device, &self.config);
         }
     }
 
@@ -303,11 +231,16 @@ impl State {
             // Some(self.bloom.input_texture_view()),
             Some(self.bloom.input_texture_view()),
             // Some(&output_view),
-            Some(self.bloom.blackout_input_texture_view()),
+            Some(self.downsampling.input_texture_view()),
             // None,
         );
 
-        self.bloom.render(&mut encoder, Some(&output_view));
+        // self.bloom.render(&mut encoder, Some(&output_view));
+        self.downsampling
+            .render(&mut encoder, Some(self.upsampling.input_texture_view()));
+        // self.downsampling.render(&mut encoder, Some(&output_view));
+        self.upsampling.render(&mut encoder, Some(&output_view));
+        // self.upsampling.render(&mut encoder, Some(&output_view));
 
         self.queue.submit(iter::once(encoder.finish()));
 
@@ -337,53 +270,3 @@ impl State {
         }
     }
 }
-
-// fn save_texture_as_image(device: &wgpu::Device, queue: &wgpu::Queue, texture: &wgpu::Texture, path: &str) {
-//     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-//         label: Some("Read Texture Encoder"),
-//     });
-//     encoder.copy_texture_to_buffer(
-//         wgpu::ImageCopyTexture {
-//             texture,
-//             mip_level: 0,
-//             origin: wgpu::Origin3d::ZERO,
-//             aspect: wgpu::TextureAspect::All,
-//         },
-//         wgpu::ImageCopyBuffer {
-//             buffer: &device.create_buffer(&wgpu::BufferDescriptor {
-//                 label: Some("Texture Buffer"),
-//                 size: (4 * texture.size().width * texture.size().height) as wgpu::BufferAddress,
-//                 usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
-//                 mapped_at_creation: false,
-//             }),
-//             layout: wgpu::ImageDataLayout {
-//                 offset: 0,
-//                 bytes_per_row: Some(4 * texture.size().width),
-//                 rows_per_image: Some(texture.size().height),
-//             },
-//         },
-//         texture.size(),
-//     );
-//     // Ensure the texture is ready for reading
-//     queue.submit(iter::once(encoder.finish()));
-//
-//     let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-//         label: Some("Read Texture Buffer"),
-//         size: (4 * texture.size().width * texture.size().height) as wgpu::BufferAddress,
-//         usage: wgpu::BufferUsages::COPY_SRC,
-//         mapped_at_creation: false,
-//     });
-//
-//     // Map the buffer for reading
-//     let buffer_slice = buffer.slice(..);
-//
-//     let buffer_view = buffer_slice.get_mapped_range();
-//     let image = image::DynamicImage::ImageRgba8(
-//         image::RgbaImage::from_raw(texture.size().width, texture.size().height, buffer_view.to_vec()).unwrap(),
-//     );
-//
-//     // Save the image to a file
-//     image.save(path).expect("Failed to save image file");
-//
-//     device.poll(wgpu::Maintain::Wait);
-// }
