@@ -1,3 +1,10 @@
+// for a systems where:
+// c = 1
+// GM = 1
+// .:
+// r_s = 2
+// V = -1/r
+
 // Vertex shader
 struct Camera {
     // 0 bytes
@@ -35,7 +42,7 @@ fn vs_main(
 struct Uniforms {
     // 0 bytes
     RS: f32,
-    MAX_DELTA_TIME: f32,
+    DELTA_TIME_MULT: f32,
     BG_BRIGHTNESS: f32,
     BLACKOUT_EH: u32,
     MAX_DIST: f32,
@@ -77,7 +84,8 @@ fn sdf_accretion_disk(p: vec3<f32>, centre: vec3<f32>, big_r: f32, little_r: f32
 
 fn get_dist(p: vec3<f32>) -> f32 {
     let sd_accretion_disk = sdf_accretion_disk(p, vec3<f32>(0.0), 6.0 * u.RS, 3.0 * u.RS);
-    return sd_accretion_disk;
+    let sd_sphere = sdf_sphere(p, vec3<f32>(10.0, 0.0, 0.0), 1.0);
+    return min(sd_accretion_disk, sd_sphere);
 }
 
 fn rd_derivative(ro: vec3<f32>, h2: f32) -> vec3<f32> {
@@ -165,16 +173,20 @@ fn get_col(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec3<f32> {
             return vec3<f32>(1.0);
         }
 
-        let ps_dist = sdf_sphere(ro, -normalize(ray_origin) * 1.5 * u.RS, 0.075);
-        if ps_dist < MIN_DIST {
+        let photon_sphere_dist = sdf_sphere(ro, -normalize(ray_origin) * 1.5 * u.RS, 0.075);
+        if photon_sphere_dist < MIN_DIST {
             return vec3<f32>(1.0, 1.0, 0.0);
         }
 
-        let dist = min(dist_0, ps_dist);
+        let dist = min(dist_0, photon_sphere_dist);
 
         let rd_der = rd_derivative(ro, h2);
 
-        let dd = min(dist * 0.9, u.MAX_DELTA_TIME / max(pow(dot(rd_der, rd_der), 0.25), 0.05));
+        // let dd = min(dist * 0.9, u.DELTA_TIME_MULT / max(pow(dot(rd_der, rd_der), 0.25), 0.05));
+        var dd = 0.1 * u.DELTA_TIME_MULT * dist_to_bh_sq;
+        // let dd = u.DELTA_TIME_MULT;
+
+        dd = min(dist * 0.9, dd);
 
         let delta_photon = get_delta_photon_rk4(ro, rd, dd, h2);
 

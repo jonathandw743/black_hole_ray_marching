@@ -135,7 +135,7 @@ pub async fn run() {
             }
             Event::LoopDestroyed => {
                 // println!("hello ended");
-                flame::dump_html(&mut std::fs::File::create("flame-graph.html").unwrap()).unwrap();
+                // flame::dump_html(&mut std::fs::File::create("flame-graph.html").unwrap()).unwrap();
             }
             _ => {}
         }

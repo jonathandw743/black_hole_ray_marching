@@ -49,7 +49,12 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, config: &wgpu::SurfaceConfiguration) -> Self {
+    pub fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        config: &wgpu::SurfaceConfiguration,
+        render_blackout: bool,
+    ) -> Self {
         let resolution_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             size: std::mem::size_of::<UVec2>() as wgpu::BufferAddress,
             label: Some("scene resolution_uniform_buffer"),
@@ -87,15 +92,24 @@ impl Scene {
                 OtherUniform {
                     label: "swartschild radius".into(),
                     // shader_stage: ShaderStages::FRAGMENT,
-                    inc_value: Box::new(IncValue { value: 1.0, inc: 0.2 }),
+                    inc_value: Box::new(IncValue {
+                        value: 1.0,
+                        inc: 0.2,
+                    }),
                 },
                 OtherUniform {
                     label: "max delta time".into(),
-                    inc_value: Box::new(IncValue { value: 0.3, inc: 0.02 }),
+                    inc_value: Box::new(IncValue {
+                        value: 0.3,
+                        inc: 0.02,
+                    }),
                 },
                 OtherUniform {
                     label: "background brightness".into(),
-                    inc_value: Box::new(IncValue { value: 0.5, inc: 0.1 }),
+                    inc_value: Box::new(IncValue {
+                        value: 0.5,
+                        inc: 0.1,
+                    }),
                 },
                 OtherUniform {
                     label: "blackout event horizon".into(),
@@ -106,11 +120,17 @@ impl Scene {
                 },
                 OtherUniform {
                     label: "max view distance".into(),
-                    inc_value: Box::new(IncValue { value: 50.0, inc: 1.0 }),
+                    inc_value: Box::new(IncValue {
+                        value: 50.0,
+                        inc: 1.0,
+                    }),
                 },
                 OtherUniform {
                     label: "distortion power".into(),
-                    inc_value: Box::new(IncValue { value: 1.0, inc: 0.2 }),
+                    inc_value: Box::new(IncValue {
+                        value: 1.0,
+                        inc: 0.2,
+                    }),
                 },
             ],
         );
@@ -172,27 +192,28 @@ impl Scene {
         }
         let space_texture = Texture::from_bytes(&device, &queue, space_bytes, "space").unwrap();
 
-        let space_texture_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+        let space_texture_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-            label: Some("space_bind_group_layout"),
-        });
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+                label: Some("space_bind_group_layout"),
+            });
 
         let space_texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &space_texture_bind_group_layout,
@@ -215,11 +236,12 @@ impl Scene {
             source: wgpu::ShaderSource::Wgsl(include_str!("./black_hole_maybe.wgsl").into()),
         });
 
-        let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("scene Pipeline Layout"),
-            bind_group_layouts: &[&bind_group_layout, &space_texture_bind_group_layout],
-            push_constant_ranges: &[],
-        });
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("scene Pipeline Layout"),
+                bind_group_layouts: &[&bind_group_layout, &space_texture_bind_group_layout],
+                push_constant_ranges: &[],
+            });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("scene Pipeline"),
@@ -238,11 +260,15 @@ impl Scene {
                         blend: Some(wgpu::BlendState::REPLACE),
                         write_mask: wgpu::ColorWrites::ALL,
                     }),
-                    Some(wgpu::ColorTargetState {
-                        format: config.format,
-                        blend: Some(wgpu::BlendState::REPLACE),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    }),
+                    if render_blackout {
+                        Some(wgpu::ColorTargetState {
+                            format: config.format,
+                            blend: Some(wgpu::BlendState::REPLACE),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })
+                    } else {
+                        None
+                    },
                 ],
             }),
             primitive: wgpu::PrimitiveState {
@@ -302,7 +328,11 @@ impl Scene {
         }
     }
 
-    pub fn create_resolution(queue: &wgpu::Queue, config: &wgpu::SurfaceConfiguration, buffer: &wgpu::Buffer) -> UVec2 {
+    pub fn create_resolution(
+        queue: &wgpu::Queue,
+        config: &wgpu::SurfaceConfiguration,
+        buffer: &wgpu::Buffer,
+    ) -> UVec2 {
         let resolution_uniform = uvec2(config.width, config.height);
         queue.write_buffer(buffer, 0, &resolution_uniform.uniform_buffer_content());
         return resolution_uniform;
@@ -327,7 +357,8 @@ impl Scene {
             view_formats: &[],
         });
 
-        let output_texture_view = output_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let output_texture_view =
+            output_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         return (output_texture, output_texture_view);
     }
@@ -340,7 +371,8 @@ impl Scene {
         config: &wgpu::SurfaceConfiguration,
         // input_texture_view: &wgpu::TextureView,
     ) {
-        self.resolution_uniform = Self::create_resolution(queue, config, &self.resolution_uniform_buffer);
+        self.resolution_uniform =
+            Self::create_resolution(queue, config, &self.resolution_uniform_buffer);
 
         self.camera.aspect = config.width as f32 / config.height as f32;
     }
@@ -354,9 +386,12 @@ impl Scene {
                 &self.other_uniforms.uniform_buffer_content(),
             );
         }
-        [other_uniforms_event_result, self.camera_controller.process_event(event)]
-            .iter()
-            .any(|&result| result)
+        [
+            other_uniforms_event_result,
+            self.camera_controller.process_event(event),
+        ]
+        .iter()
+        .any(|&result| result)
     }
 
     pub fn update(
@@ -370,7 +405,9 @@ impl Scene {
             &mut self.camera,
             delta_time,
             match (prev_cursor_position, cursor_position) {
-                (Some(prev), Some(curr)) => vec2(curr.x as f32, curr.y as f32) != vec2(prev.x as f32, prev.y as f32),
+                (Some(prev), Some(curr)) => {
+                    vec2(curr.x as f32, curr.y as f32) != vec2(prev.x as f32, prev.y as f32)
+                }
                 _ => false,
             },
         );

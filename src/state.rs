@@ -30,9 +30,9 @@ pub struct State {
 
     pub scene: Scene,
     // pub blur: Blur,
-    pub bloom: Bloom<5>,
-    pub downsampling: Downsampling<5>,
-    pub upsampling: Upsampling<5>,
+    pub bloom: Bloom<{ Self::LEVELS }>,
+    pub downsampling: Downsampling<{ Self::LEVELS }>,
+    pub upsampling: Upsampling<{ Self::LEVELS }>,
 
     // timing
     pub start_of_last_frame_instant: Instant,
@@ -45,6 +45,8 @@ pub struct State {
 }
 
 impl State {
+    const LEVELS: usize = 3;
+
     pub async fn new(window: Window) -> Self {
         let size = window.inner_size();
         let x = 3.0;
@@ -120,7 +122,7 @@ impl State {
 
         surface.configure(&device, &config);
 
-        let scene = Scene::new(&device, &queue, &config);
+        let scene = Scene::new(&device, &queue, &config, false);
 
         // let blur = Blur::new(&device, &queue, &config, &scene.output_texture_view);
 
@@ -173,7 +175,7 @@ impl State {
             self.surface.configure(&self.device, &self.config);
             self.scene.resize(&self.device, &self.queue, &self.config);
             self.bloom.resize(&self.device, &self.config);
-            self.downsampling.resize(&self.device, &self.config);
+            // self.downsampling.resize(&self.device, &self.config);
             self.downsampling.resize(&self.device, &self.config);
         }
     }
@@ -229,17 +231,18 @@ impl State {
         self.scene.render(
             &mut encoder,
             // Some(self.bloom.input_texture_view()),
-            Some(self.bloom.input_texture_view()),
-            // Some(&output_view),
-            Some(self.downsampling.input_texture_view()),
+            // Some(self.bloom.input_texture_view()),
             // None,
+            Some(&output_view),
+            // Some(self.downsampling.input_texture_view()),
+            None,
         );
 
         // self.bloom.render(&mut encoder, Some(&output_view));
-        self.downsampling
-            .render(&mut encoder, Some(self.upsampling.input_texture_view()));
+        // self.downsampling
+        // .render(&mut encoder, Some(self.upsampling.input_texture_view()));
         // self.downsampling.render(&mut encoder, Some(&output_view));
-        self.upsampling.render(&mut encoder, Some(&output_view));
+        // self.upsampling.render(&mut encoder, Some(&output_view));
         // self.upsampling.render(&mut encoder, Some(&output_view));
 
         self.queue.submit(iter::once(encoder.finish()));
