@@ -1,19 +1,10 @@
 // use cgmath::Zero;
 use wgpu::util::DeviceExt;
-use winit::{
-    dpi::PhysicalSize,
-};
+use winit::dpi::PhysicalSize;
 
-use glam::{
-    Vec3, Mat4,
-};
+use glam::{Mat4, Vec3};
 
-
-use encase::{
-    ShaderType,
-};
-
-
+use encase::ShaderType;
 
 use crate::camera::Camera;
 
@@ -108,6 +99,7 @@ impl AntiAliasingUniform {
 pub struct CameraUniform {
     pos: Vec3,
     view_proj: Mat4,
+    inverse_view_proj: Mat4,
 }
 
 impl CameraUniform {
@@ -115,11 +107,13 @@ impl CameraUniform {
         Self {
             pos: Vec3::ZERO,
             view_proj: Mat4::IDENTITY,
+            inverse_view_proj: Mat4::IDENTITY,
         }
     }
     pub fn update(&mut self, camera: &Camera) {
         self.pos = camera.pos;
         self.view_proj = camera.build_view_projection_matrix();
+        self.inverse_view_proj = self.view_proj.inverse();
     }
 }
 

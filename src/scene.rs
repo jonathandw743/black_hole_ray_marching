@@ -274,7 +274,7 @@ impl Scene {
             vertex: wgpu::VertexState {
                 module: &black_hole_shader,
                 entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
+                buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &black_hole_shader,
@@ -488,13 +488,14 @@ impl Scene {
 
         render_pass.set_pipeline(&self.render_pipeline);
 
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        // render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        // render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
         render_pass.set_bind_group(0, &self.bind_group, &[]);
 
         render_pass.set_bind_group(1, &self.space_texture_bind_group, &[]);
 
-        render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+        // render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+        render_pass.draw(0..3, 0..1);
     }
 }
