@@ -1,12 +1,13 @@
-use std::num::NonZeroU64;
+use std::{fmt::Debug, num::NonZeroU64};
 
-use encase::{ShaderType, internal::{WriteInto, Writer}};
 use crate::uniformscontroller::{Increment, Opposite};
-use winit::event::{WindowEvent, VirtualKeyCode, ElementState, KeyboardInput};
+use encase::{
+    internal::{WriteInto, Writer},
+    ShaderType,
+};
+use winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 use crate::settings::number_from_virtual_key_code;
-
-
 
 // mental gymnastics begins
 
@@ -37,6 +38,7 @@ pub struct OtherUniform {
     pub inc_value: Box<dyn IncValueTrait>,
 }
 
+#[derive(Debug)]
 pub struct IncValue<T, I>
 where
     T: Increment<I>,
@@ -47,7 +49,7 @@ where
     pub inc: I,
 }
 
-pub trait IncValueTrait {
+pub trait IncValueTrait: Debug {
     fn increment(&mut self);
     fn decrement(&mut self);
     // could change this into a more generic UniformBuffer thing like encase does
@@ -57,15 +59,17 @@ pub trait IncValueTrait {
 
 impl<T, I> IncValueTrait for IncValue<T, I>
 where
-    T: Increment<I>,
-    I: Opposite<I>,
+    T: Increment<I> + Debug,
+    I: Opposite<I> + Debug,
     T: ShaderType + WriteInto,
 {
     fn increment(&mut self) {
         self.value = self.value.increment(&self.inc);
+        println!("new value: {:?}", self.value);
     }
     fn decrement(&mut self) {
         self.value = self.value.increment(&self.inc.opposite());
+        println!("new value: {:?}", self.value);
     }
     fn write_into_buffer(&self, buffer: &mut Vec<u8>, offset: usize) {
         let mut writer = Writer::new(&self.value, buffer, offset).unwrap();

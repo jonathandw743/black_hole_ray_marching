@@ -3,8 +3,7 @@ use crate::uniformscontroller::{Increment, Opposite};
 use encase::ShaderType;
 // #[repr(C)]
 // #[derive(bytemuck::Pod, Copy, Clone, bytemuck::Zeroable, Debug)]
-#[derive(Copy, Clone)]
-#[derive(ShaderType)]
+#[derive(Copy, Clone, ShaderType, Debug)]
 pub struct PodBool {
     inner: u32,
 }
