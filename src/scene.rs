@@ -100,7 +100,7 @@ impl Scene {
                 OtherUniform {
                     label: "max delta time".into(),
                     inc_value: Box::new(IncValue {
-                        value: 0.3,
+                        value: 0.5,
                         inc: 0.02,
                     }),
                 },
@@ -121,7 +121,7 @@ impl Scene {
                 OtherUniform {
                     label: "max view distance".into(),
                     inc_value: Box::new(IncValue {
-                        value: 50.0,
+                        value: 250.0,
                         inc: 1.0,
                     }),
                 },

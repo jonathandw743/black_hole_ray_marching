@@ -1,6 +1,7 @@
 use std::iter;
 use wgpu::InstanceFlags;
 use winit::dpi::PhysicalPosition;
+use winit::window::Fullscreen;
 use winit::{event::*, window::Window};
 
 use crate::bloom::Bloom;
@@ -184,6 +185,23 @@ impl State {
         match event {
             &WindowEvent::CursorMoved { position, .. } => {
                 self.cursor_position = Some(position);
+                true
+            }
+            WindowEvent::KeyboardInput {
+                input:
+                    KeyboardInput {
+                        state: ElementState::Pressed,
+                        virtual_keycode: Some(VirtualKeyCode::F11),
+                        ..
+                    },
+                ..
+            } => {
+                if let Some(_) = self.window().fullscreen() {
+                    self.window().set_fullscreen(None);
+                } else {
+                    self.window()
+                        .set_fullscreen(Some(Fullscreen::Borderless(None)));
+                }
                 true
             }
             _ => false,

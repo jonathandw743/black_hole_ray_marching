@@ -3,7 +3,7 @@ use winit::{
     dpi::PhysicalSize,
     event::*,
     event_loop::{ControlFlow, EventLoop},
-    window::{Window, WindowBuilder},
+    window::{Fullscreen, Window, WindowBuilder},
 };
 
 #[cfg(target_arch = "wasm32")]

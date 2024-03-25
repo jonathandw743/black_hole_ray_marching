@@ -152,44 +152,51 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
     var distance_travelled = 0.0;
     for (var i = 0; i < MAX_ITERATIONS; i++) {
 
-        let dist_to_bh_sq = dot(photon.ro, photon.ro);
-        if u32_to_bool(u.BLACKOUT_EH) && dist_to_bh_sq < 1.0 {
+        // the photon should approach the event horizon
+        // given the desired distance calculation above
+        // just like the ray approaches a surface in raymarching
+        let dist_to_eh = sdf_sphere(photon.ro, vec3f(0.0), u.RS);
+        if u32_to_bool(u.BLACKOUT_EH) && dist_to_eh < MIN_DIST {
             return vec3<f32>(0.0);
         }
 
-        let dist_0 = sdf(photon.ro);
-        if dist_0 < MIN_DIST {
+        let dist_to_surfaces = sdf(photon.ro);
+        if dist_to_surfaces < MIN_DIST {
             return vec3<f32>(1.0);
         }
 
+        // photon is a small sphere at the back of the black hole
+        // distance of 1.5 * r_s away
+        // we say that if a photon hits this sphere, it goes into temporary orbit around the black hole
+        // https://upload.wikimedia.org/wikipedia/commons/2/27/Black_Hole_Shadow.gif
         let photon_sphere_dist = sdf_sphere(photon.ro, -normalize(initial_photon.ro) * 1.5 * u.RS, 0.075);
         if photon_sphere_dist < MIN_DIST {
             return vec3<f32>(1.0, 1.0, 0.0);
         }
 
-        let dist = min(dist_0, photon_sphere_dist);
-
-        let rd_der = rd_derivative(photon.ro, h2);
-        
-        let dist_to_eh = sqrt(dist_to_bh_sq) - u.RS;
+        let dist = min(dist_to_surfaces, photon_sphere_dist);
 
         // the photon should be able to travel further if it is far away from the black hole
         // k * distance to event horizon
-        var dd = 0.5 * (sqrt(dist_to_bh_sq) - u.RS);
+        // so each step, the maximum distance the photon can travel is about half the distance to the event horizon
+        // also, when travelling away from the black hole,
+        // the distance away from the black hole should grow exponentially
+        // this means max view distance can be increased massively
+        var dd = u.DELTA_TIME_MULT * dist_to_eh;
+        // then apply the ray marching distance
+        // 0.9 multiplier just to account for any error due to the curvature of the ray
         dd = min(dist * 0.9, dd);
 
+        // how the photon should move given the desired distance and the current state of the photonn
         let delta_photon = get_delta_photon_rk4(photon, dd, h2);
 
-        //todo this could need changing
-        // if u32_to_bool(u.BLACKOUT_EH) && dot(photon.ro, photon.ro + delta_photon.ro) < 0.0 {
-        //     return vec3<f32>(0.0);
-        // }
-      
-        if (u32_to_bool(u.BLACKOUT_EH) && dist_to_eh < MIN_DIST) {
-          return vec3<f32>(0.0);
-        }
-
         photon.ro += delta_photon.ro;
+        // photon.rd won't be a unit vector at all points in the loop
+        // so there's no guarantee that the distance travelled along the light path
+        // equals dd
+        // but it is a good approximation
+        // and its too expensive to actually ensure this
+        // but its a good enough appoximation
         photon.rd += delta_photon.rd;
 
         distance_travelled += dd;
@@ -198,17 +205,16 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
         }
     }
     // any unit vector
-    let nrd = normalize(photon.rd);
+    let normalized_final_rd = normalize(photon.rd);
     // range -PI to +PI
-    let azimuthal_angle = atan2(final_rd.z, final_rd.x);
+    let azimuthal_angle = atan2(normalized_final_rd.z, normalized_final_rd.x);
     // range 0 to 1
     let x = (azimuthal_angle + ONE_PI) / TWO_PI;
     // range 0 to 1
-    let y = (final_rd.y + 1.0) * 0.5;
+    let y = (normalized_final_rd.y + 1.0) * 0.5;
 
-    // let col = tsw(t_diffuse, s_diffuse, vec2<f32>(x, y)).xyz;
-    // -y because in texture coords, +y is down
-    let col = textureSampleLevel(t_diffuse, s_diffuse, vec2<f32>(x, -y), 0.0).xyz;
+    // 1 - y because in texture coords, +y is down
+    let col = textureSampleLevel(t_diffuse, s_diffuse, vec2<f32>(x, 1.0 - y), 0.0).xyz;
     return col;
 }
 
