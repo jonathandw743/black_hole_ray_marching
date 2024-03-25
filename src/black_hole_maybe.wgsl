@@ -197,18 +197,8 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
             break;
         }
     }
-  
-    // if the photon didn't hit anything, we can do a better calculation to work out the background
-    let normalised_initial_rd = normalize(initial_photon.rd);
-    let dist_to_bh_sq = dot(initial_photon.ro, initial_photon.ro);
-    let co_impact_parameter = -dot(initial_photon.ro, normalised_initial_rd);
-    let impact_parameter = sqrt(dist_to_bh_sq + co_impact_parameter * co_impact_parameter);
-    let angle_of_deflection = 2.0 * u.RS / impact_parameter;
-    let axis = normalize(initial_ro_rd_cross);
-    let final_rd = rotate_vector(normalised_initial_rd, axis, angle_of_deflection);
-
-    // // any unit vector
-    // let nrd = normalize(photon.rd);
+    // any unit vector
+    let nrd = normalize(photon.rd);
     // range -PI to +PI
     let azimuthal_angle = atan2(final_rd.z, final_rd.x);
     // range 0 to 1
