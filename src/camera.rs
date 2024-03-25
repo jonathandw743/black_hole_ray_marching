@@ -42,7 +42,6 @@ impl Camera {
         // right vector (normalized)
         let r = self.right();
 
-        #[rustfmt::skip]
         let view = mat4(
             vec4(r.x.clone(), u.x.clone(), -f.x.clone(), 0.0),
             vec4(r.y.clone(), u.y.clone(), -f.y.clone(), 0.0),

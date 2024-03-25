@@ -19,13 +19,19 @@ var<uniform> camera: Camera;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
+  // @builtin(vertex_index) vertex_index: u32,
 }
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) position: vec3<f32>,
     @location(1) camera_to_vertex: vec3<f32>,
 }
+
+var<private> positions: array<vec2f, 3> = array<vec2f, 3>(
+    vec2f(3.0, 1.0),
+    vec2f(-1.0, 1.0),
+    vec2f(-1.0, -3.0),
+);
 
 @vertex
 fn vs_main(
@@ -34,7 +40,7 @@ fn vs_main(
     var out: VertexOutput;
     out.camera_to_vertex = model.position - camera.pos.xyz;
     out.clip_position = camera.view_proj * vec4<f32>(model.position, 1.0); // 2.
-    out.position = model.position;
+    // out.position = vec4f(positions[vertex_index], 0.0, 1.0);
     return out;
 }
 
@@ -144,6 +150,27 @@ fn get_delta_photon_rk4(photon: Photon, delta_time: f32, h2: f32) -> Photon {
     return vec3<f32>(x, y, z);
   }
 
+fn tsw(t: texture_2d<f32>, s: sampler, p: vec2f) -> vec4f {
+  return textureSample(t, s, p);
+}
+
+fn linearTextureSampleTest(t: texture_2d<f32>, s: sampler, p: vec2f) -> vec4f {
+  let dim = vec2f(textureDimensions(t));
+  let inv_dim = 1.0 / dim;
+  let p_pixel_space = p * dim;
+  let p_floor = floor(p_pixel_space) * inv_dim;
+  // let p_ceil = ceil(p_pixep_pixel_space) * inv_dim;
+  let p_ceil = p_floor + inv_dim;
+  let a = textureSampleLevel(t, s, p_floor, 0.0);
+  let b = textureSampleLevel(t, s, vec2f(p_ceil.x, p_floor.x), 0.0);
+  let c = textureSampleLevel(t, s, vec2f(p_floor.x, p_ceil.x), 0.0);
+  let d = textureSampleLevel(t, s, p_ceil, 0.0);
+  let p_fract = p - p_floor;
+  let ab = a * p_fract.x + b * (1.0 - p_fract.x);
+  let cd = c * p_fract.x + d * (1.0 - p_fract.x);
+  return ab * p_fract.y + cd * (1.0 - p_fract.y);
+}
+
 fn get_col(initial_photon: Photon) -> vec3<f32> {
     var photon = Photon(initial_photon.ro, initial_photon.rd); 
     var initial_ro_rd_cross = cross(photon.ro, photon.rd);
@@ -214,7 +241,9 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
     let y = (normalized_final_rd.y + 1.0) * 0.5;
 
     // 1 - y because in texture coords, +y is down
-    let col = textureSampleLevel(t_diffuse, s_diffuse, vec2<f32>(x, 1.0 - y), 0.0).xyz;
+    // let col = tsw(t_diffuse, s_diffuse, vec2<f32>(x, 1.0 - y)).xyz;
+    // let col = textureSampleLevel(t_diffuse, s_diffuse, vec2<f32>(floor(x), floor(1.0 - y)), 0.0).xyz;
+    let col = linearTextureSampleTest(t_diffuse, s_diffuse, vec2<f32>(x, 1.0 - y)).xyz;
     return col;
 }
 
@@ -240,5 +269,6 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     if dot(col, col) < 1.0 {
         blackout_col = vec3<f32>(0.0);
     }
-    return FragmentOutput(vec4<f32>(col, 1.0), vec4<f32>(blackout_col, 1.0));
+    return FragmentOutput(in.clip_position, vec4f(0.0));
+    // return FragmentOutput(vec4<f32>(col, 1.0), vec4<f32>(blackout_col, 1.0));
 }

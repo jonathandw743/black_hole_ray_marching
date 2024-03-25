@@ -9,7 +9,7 @@ use crate::{
     vertices::VERTICES,
 };
 
-use glam::{uvec2, vec2, vec3, UVec2, Vec2, Vec3};
+use glam::{uvec2, vec2, vec3, vec4, UVec2, Vec2, Vec3, Vec4Swizzles};
 
 use std::f32::consts::PI;
 
@@ -73,6 +73,30 @@ impl Scene {
             znear: 0.1,
             zfar: 100.0,
         };
+        {
+            let positions = vec![vec2(3.0, 1.0), vec2(-1.0, 1.0), vec2(-1.0, -3.0)];
+
+            println!("{:?}", camera.build_view_projection_matrix().inverse());
+            // println!(
+            //     "{:?}",
+            //     camera.build_view_projection_matrix() * vec4(0.0, 0.0, 100.0, 1.0)
+            // );
+            // println!(
+            //     "{:?}",
+            //     camera.build_view_projection_matrix() * vec4(1.0, 0.0, 0.0, 1.0)
+            // );
+            // println!(
+            //     "{:?}",
+            //     camera.build_view_projection_matrix() * vec4(1.0, 0.0, 30.0, 1.0)
+            // );
+            for pos in positions {
+                let clip_pos_hom = vec4(pos.x, pos.y, 0.0, 1.0);
+                let mut world_pos_hom =
+                    camera.build_view_projection_matrix().inverse() * clip_pos_hom;
+                world_pos_hom /= world_pos_hom.w;
+                println!("{:?}", world_pos_hom.xyz() - camera.pos);
+            }
+        }
 
         let camera_controller = CameraController::new(5.0, 0.5);
 
@@ -186,7 +210,8 @@ impl Scene {
             if #[cfg(target_arch = "wasm32")] {
                 let space_bytes = include_bytes!("space_2048x1024.jpg");
             } else {
-                let space_bytes = include_bytes!("space_4096x2048.jpg");
+                // let space_bytes = include_bytes!("space_4096x2048.jpg");
+                let space_bytes = include_bytes!("dark_space.jpg");
                 // let space_bytes = include_bytes!("space_4096x2048.jpg");
             }
         }

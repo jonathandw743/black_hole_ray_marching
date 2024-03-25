@@ -197,9 +197,9 @@ impl State {
                 ..
             } => {
                 if let Some(_) = self.window().fullscreen() {
-                    self.window().set_fullscreen(None);
+                    self.window.set_fullscreen(None);
                 } else {
-                    self.window()
+                    self.window
                         .set_fullscreen(Some(Fullscreen::Borderless(None)));
                 }
                 true
