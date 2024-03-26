@@ -94,7 +94,7 @@ fn sdf_accretion_disk(p: vec3<f32>, centre: vec3<f32>, big_r: f32, little_r: f32
 }
 
 fn sdf(p: vec3<f32>) -> f32 {
-    let sd_accretion_disk = sdf_accretion_disk(p, vec3<f32>(0.0), 6.0 * u.RS, 3.0 * u.RS);
+    let sd_accretion_disk = sdf_accretion_disk(p, vec3<f32>(0.0), 12.0 * u.RS, 3.0 * u.RS);
     let sd_sphere = sdf_sphere(p, vec3<f32>(10.0, 0.0, 0.0), 1.0);
     return min(sd_accretion_disk, sd_sphere);
 }

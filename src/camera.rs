@@ -166,11 +166,11 @@ impl CameraController {
                         self.is_pan_right_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::R => {
+                    VirtualKeyCode::Space => {
                         self.is_up_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::F => {
+                    VirtualKeyCode::E => {
                         self.is_down_pressed = is_pressed;
                         true
                     }
@@ -209,7 +209,7 @@ impl CameraController {
             (true, false) => -1.0,
             (true, true) => 0.0,
         };
-        let _z_movement = dt * self.speed * z_movement_norm;
+        let z_movement = dt * self.speed * z_movement_norm;
 
         let y_movement_norm = match (self.is_down_pressed, self.is_up_pressed) {
             (false, false) => 0.0,
@@ -220,10 +220,10 @@ impl CameraController {
         let y_movement = dt * self.speed * y_movement_norm;
 
         camera.pos += x_movement * camera.right();
-        // camera.pos += z_movement * camera.dir;
+        camera.pos += z_movement * camera.dir;
         camera.pos += y_movement * camera.up;
 
-        camera.pos = camera.pos * (-dt * z_movement_norm).exp();
+        // camera.pos = camera.pos * (-dt * z_movement_norm).exp();
 
         let x_pan_norm = match (self.is_pan_left_pressed, self.is_pan_right_pressed) {
             (false, false) => 0.0,
