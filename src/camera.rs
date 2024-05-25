@@ -6,7 +6,7 @@ use winit::{dpi::PhysicalPosition, event::*};
 
 // use cgmath::{Quaternion, Rad};
 
-use glam::{mat4, vec2, vec4, Mat4, Quat, Vec2, Vec3};
+use glam::{mat4, vec2, vec3, vec4, Mat4, Quat, Vec2, Vec3, Vec4Swizzles};
 
 pub struct Camera {
     pub pos: Vec3,
@@ -52,6 +52,64 @@ impl Camera {
 
         return OPENGL_TO_WGPU_MATRIX * proj * view;
     }
+
+    pub fn rot_matrix(&self) -> Mat4 {
+        Mat4::look_at_rh(self.pos, self.pos + self.dir, self.up).inverse()
+    }
+
+    pub fn tan_fov_half(&self) -> Vec2 {
+        let tan_fovy_half = (self.fovy / 2.0).tan();
+        vec2(tan_fovy_half * self.aspect, tan_fovy_half)
+    }
+
+    pub fn clip_position_with_tansform_to_direction(
+        tan_fov_half: Vec2,
+        rot_matrix: Mat4,
+        clip_position: Vec2,
+    ) -> Vec3 {
+        let dir_camera = -vec3(
+            tan_fov_half.x * clip_position.x,
+            -tan_fov_half.y * clip_position.y,
+            1.0,
+        );
+        // Transform the direction vector to world space
+        let dir_world = rot_matrix.transform_vector3(dir_camera);
+
+        // Normalize the direction vector
+        // dir_world.normalize()
+        dir_world
+    }
+
+    pub fn clip_position_to_world_direction(&self, clip_position: Vec2) -> Vec3 {
+        let tan_fov_half = self.tan_fov_half();
+        let rot_matrix = self.rot_matrix();
+        Self::clip_position_with_tansform_to_direction(tan_fov_half, rot_matrix, clip_position)
+    }
+
+    pub fn pos_to_world_space_screen_triangle(
+        &self,
+        screen_space_screen_triangle: [Vec2; 3],
+    ) -> [Vec3; 3] {
+        let tan_fov_half = self.tan_fov_half();
+        let rot_matrix = self.rot_matrix();
+        [
+            Self::clip_position_with_tansform_to_direction(
+                tan_fov_half,
+                rot_matrix,
+                screen_space_screen_triangle[0],
+            ),
+            Self::clip_position_with_tansform_to_direction(
+                tan_fov_half,
+                rot_matrix,
+                screen_space_screen_triangle[1],
+            ),
+            Self::clip_position_with_tansform_to_direction(
+                tan_fov_half,
+                rot_matrix,
+                screen_space_screen_triangle[2],
+            ),
+        ]
+    }
 }
 
 pub struct CameraController {
@@ -70,6 +128,9 @@ pub struct CameraController {
     is_pan_down_pressed: bool,
     is_pan_left_pressed: bool,
     is_pan_right_pressed: bool,
+
+    is_exp_towards_origin_pressed: bool,
+    is_exp_away_origin_pressed: bool,
 
     prev_cursor_position: Option<PhysicalPosition<f64>>,
     curr_cursor_position: Option<PhysicalPosition<f64>>,
@@ -94,6 +155,9 @@ impl CameraController {
             is_pan_down_pressed: false,
             is_pan_left_pressed: false,
             is_pan_right_pressed: false,
+
+            is_exp_towards_origin_pressed: false,
+            is_exp_away_origin_pressed: false,
 
             prev_cursor_position: None,
             curr_cursor_position: None,
@@ -166,12 +230,32 @@ impl CameraController {
                         self.is_pan_right_pressed = is_pressed;
                         true
                     }
+                    VirtualKeyCode::P => {
+                        self.is_exp_towards_origin_pressed = is_pressed;
+                        true
+                    }
+                    VirtualKeyCode::O => {
+                        self.is_exp_away_origin_pressed = is_pressed;
+                        true
+                    }
+                    VirtualKeyCode::Right => {
+                        self.is_exp_away_origin_pressed = is_pressed;
+                        true
+                    }
                     VirtualKeyCode::Space => {
                         self.is_up_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::E => {
+                    VirtualKeyCode::F => {
                         self.is_down_pressed = is_pressed;
+                        true
+                    }
+                    VirtualKeyCode::Q => {
+                        self.speed /= 1.5;
+                        true
+                    }
+                    VirtualKeyCode::E => {
+                        self.speed *= 1.5;
                         true
                     }
                     _ => false,
@@ -223,7 +307,14 @@ impl CameraController {
         camera.pos += z_movement * camera.dir;
         camera.pos += y_movement * camera.up;
 
-        // camera.pos = camera.pos * (-dt * z_movement_norm).exp();
+        let exp_towards_away_origin_norm = match (self.is_exp_towards_origin_pressed, self.is_exp_away_origin_pressed) {
+            (false, false) => 0.0,
+            (false, true) => 1.0,
+            (true, false) => -1.0,
+            (true, true) => 0.0,
+        };
+
+        camera.pos = camera.pos * (-dt * exp_towards_away_origin_norm).exp();
 
         let x_pan_norm = match (self.is_pan_left_pressed, self.is_pan_right_pressed) {
             (false, false) => 0.0,

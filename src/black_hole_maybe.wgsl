@@ -9,8 +9,11 @@
 struct Camera {
     // 0 bytes
     pos: vec3<f32>,
-    view_proj: mat4x4<f32>,
-    inverse_view_proj: mat4x4<f32>,
+    // view_proj: mat4x4<f32>,
+    // inverse_view_proj: mat4x4<f32>,
+ // has to be vec4 for correct array stride 
+  screen_space_screen_triangle: array<vec4<f32>, 3>,
+  pos_to_world_space_screen_triangle: array<vec4<f32>, 3>,
 }
 @group(0) @binding(0) // 1.
 var<uniform> camera: Camera;
@@ -21,26 +24,33 @@ struct VertexInput {
 }
 
 struct VertexOutput {
-   @invariant @builtin(position) position: vec4<f32>,
+   @invariant @builtin(position) clip_position: vec4<f32>,
     @location(1) camera_to_vertex: vec3<f32>,
 }
 
-var<private> positions: array<vec2f, 3> = array<vec2f, 3>(
-    vec2f(3.0, 1.0),
-    vec2f(-1.0, 1.0),
-    vec2f(-1.0, -3.0),
-);
+// var<private> positions: array<vec2f, 3> = array<vec2f, 3>(
+//     vec2f(3.0, 1.0),
+//     vec2f(-1.0, 1.0),
+//     vec2f(-1.0, -3.0),
+// );
 
 @vertex
 fn vs_main(
 @builtin(vertex_index) vertex_index: u32,
 ) -> VertexOutput {
     var out: VertexOutput;
-  out.position = vec4f(positions[vertex_index], 0.0, 1.0);
-  var world_pos_homogeneous = camera.inverse_view_proj * out.position;
-  world_pos_homogeneous /= world_pos_homogeneous.w;
-    out.camera_to_vertex = world_pos_homogeneous.xyz - camera.pos.xyz;
+  // out.position = vec4f(positions[vertex_index], 0.0, 1.0);
+  // var world_pos_homogeneous = camera.inverse_view_proj * out.position;
+  // world_pos_homogeneous /= world_pos_homogeneous.w;
+    // out.camera_to_vertex = world_pos_homogeneous.xyz - camera.pos.xyz;
     // out.clip_position = camera.view_proj * vec4<f32>(model.position, 1.0); // 2.
+  
+  out.clip_position = camera.screen_space_screen_triangle[vertex_index];
+  out.clip_position.z = 0.0;
+  out.clip_position.w = 1.0;
+  // out.clip_position = vec4f(0.0);
+  out.camera_to_vertex = camera.pos_to_world_space_screen_triangle[vertex_index].xyz;
+  // out.camera_to_vertex = vec3f(0.0);
     return out;
 }
 
@@ -66,6 +76,7 @@ var t_diffuse: texture_2d<f32>;
 @group(1) @binding(1)
 var s_diffuse: sampler;
 
+const BH_POS: vec3f = vec3f(0.0);
 const MIN_DIST = 0.001;
 const EPSILON_VEC: vec2<f32> = vec2<f32>(1e-3, 0.0);
 const TWO_PI = 6.28318530718;
@@ -93,10 +104,22 @@ fn sdf_accretion_disk(p: vec3<f32>, centre: vec3<f32>, big_r: f32, little_r: f32
     return max(max(sdf_cylinder(p, centre.xz, big_r), -sdf_cylinder(p, centre.xz, little_r)), sdf_plane(p, centre.y));
 }
 
+fn sdf_markers(p: vec3f) -> f32 {
+    let sd_sphere_1 = sdf_sphere(p, vec3<f32>(0.0, 10.0, -10.0), 0.5);
+    let sd_sphere_2 = sdf_sphere(p, vec3<f32>(0.0, -10.0, -10.0), 0.5);
+    let sd_sphere_3 = sdf_sphere(p, vec3<f32>(10.0, 0.0, -10.0), 0.5);
+    let sd_sphere_4 = sdf_sphere(p, vec3<f32>(-10.0, 0.0, -10.0), 0.5);
+    // let sd_sphere_1 = sdf_sphere(p, vec3<f32>(0.0, 5.0, -10.0), 0.5);
+    // let sd_sphere_2 = sdf_sphere(p, vec3<f32>(0.0, -5.0, -10.0), 0.5);
+    // let sd_sphere_3 = sdf_sphere(p, vec3<f32>(5.0, 0.0, -10.0), 0.5);
+    // let sd_sphere_4 = sdf_sphere(p, vec3<f32>(-5.0, 0.0, -10.0), 0.5);
+  return min(sd_sphere_1, min(sd_sphere_2, min(sd_sphere_3, sd_sphere_4)));
+}
+
 fn sdf(p: vec3<f32>) -> f32 {
-    let sd_accretion_disk = sdf_accretion_disk(p, vec3<f32>(0.0), 12.0 * u.RS, 3.0 * u.RS);
-    let sd_sphere = sdf_sphere(p, vec3<f32>(10.0, 0.0, 0.0), 1.0);
-    return min(sd_accretion_disk, sd_sphere);
+    let sd_accretion_disk = sdf_accretion_disk(p, vec3<f32>(0.0), 6.0 * u.RS, 3.0 * u.RS);
+    let sd_markers = sdf_markers(p);
+  return min(sd_accretion_disk, sd_markers);
 }
 
 fn rd_derivative(ro: vec3<f32>, h2: f32) -> vec3<f32> {
@@ -170,21 +193,85 @@ fn linearTextureSampleTest(t: texture_2d<f32>, s: sampler, p: vec2f) -> vec4f {
   let cd = c * p_fract.x + d * (1.0 - p_fract.x);
   return ab * p_fract.y + cd * (1.0 - p_fract.y);
 }
+/*
+fn ray_march_photon(photon: Photon) -> vec3f {
+    let initial_ro_rd_cross = cross(photon.ro, photon.rd);
+    let h2 = dot(initial_ro_rd_cross, initial_ro_rd_cross);
+    var distance_travelled = 0.0;
+  
+    for (var i = 0; i < MAX_ITERATIONS; i++) {
+        // the photon should approach the event horizon
+        // given the desired distance calculation
+        // just like the ray approaches a surface in raymarching
+        let dist_to_eh = sdf_sphere(photon.ro, BH_POS, u.RS);
+        if dist_to_eh < MIN_DIST {
+            return BH_POS;
+        }
+    
+        let dist_to_surfaces = sdf(photon.ro);
+        if dist_to_surfaces < MIN_DIST {
+            return photon.ro;
+        }
 
+        // photon is a small sphere at the back of the black hole
+        // distance of 1.5 * r_s away
+        // we say that if a photon hits this sphere, it goes into temporary orbit around the black hole
+        // https://upload.wikimedia.org/wikipedia/commons/2/27/Black_Hole_Shadow.gif
+        let photon_sphere_dist = sdf_sphere(photon.ro, BH_POS - normalize(initial_photon.ro) * 1.5 * u.RS, 0.1);
+        if photon_sphere_dist < MIN_DIST {
+            return BH_POS ;
+        }
+
+        let dist = min(dist_to_surfaces, photon_sphere_dist);
+
+        // the photon should be able to travel further if it is far away from the black hole
+        // k * distance to event horizon
+        // so each step, the maximum distance the photon can travel is about half the distance to the event horizon
+        // also, when travelling away from the black hole,
+        // the distance away from the black hole should grow exponentially
+        // this means max view distance can be increased massively
+        var dd = u.DELTA_TIME_MULT * dist_to_eh;
+        // then apply the ray marching distance
+        // 0.9 multiplier just to account for any error due to the curvature of the ray
+        dd = min(dist * 0.9, dd);
+
+        // how the photon should move given the desired distance and the current state of the photonn
+        let delta_photon = get_delta_photon_rk4(photon, dd, h2);
+
+        photon.ro += delta_photon.ro;
+        // photon.rd won't be a unit vector at all points in the loop
+        // so there's no guarantee that the distance travelled along the light path
+        // equals dd
+        // but it is a good approximation
+        // and its too expensive to actually ensure this
+        // but its a good enough appoximation
+        photon.rd += delta_photon.rd;
+
+        distance_travelled += dd;
+        if distance_travelled > u.MAX_DIST {
+            break;
+        }
+    }
+}
+*/
 fn get_col(initial_photon: Photon) -> vec3<f32> {
     var photon = Photon(initial_photon.ro, initial_photon.rd); 
-    var initial_ro_rd_cross = cross(photon.ro, photon.rd);
-    var h2 = dot(initial_ro_rd_cross, initial_ro_rd_cross);
 
+    let initial_ro_rd_cross = cross(photon.ro, photon.rd);
+    let h2 = dot(initial_ro_rd_cross, initial_ro_rd_cross);
     var distance_travelled = 0.0;
     for (var i = 0; i < MAX_ITERATIONS; i++) {
-
-        // the photon should approach the event horizon
-        // given the desired distance calculation above
+        // the photon should approach the singularity
+        // given the desired distance calculation
         // just like the ray approaches a surface in raymarching
-        let dist_to_eh = sdf_sphere(photon.ro, vec3f(0.0), u.RS);
-        if u32_to_bool(u.BLACKOUT_EH) && dist_to_eh < MIN_DIST {
-            return vec3<f32>(0.0);
+        // there also be some distance to the singularity that will cause black
+        let dist_to_singularity = length(photon.ro);
+        if u32_to_bool(u.BLACKOUT_EH) {
+            if dist_to_singularity < 1.0 {
+                if dot(photon.rd, photon.ro) < 0.0 {
+                    return vec3<f32>(0.0);
+                }
+            }
         }
 
         let dist_to_surfaces = sdf(photon.ro);
@@ -209,7 +296,7 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
         // also, when travelling away from the black hole,
         // the distance away from the black hole should grow exponentially
         // this means max view distance can be increased massively
-        var dd = u.DELTA_TIME_MULT * dist_to_eh;
+        var dd = u.DELTA_TIME_MULT * dist_to_singularity;
         // then apply the ray marching distance
         // 0.9 multiplier just to account for any error due to the curvature of the ray
         dd = min(dist * 0.9, dd);

@@ -2,7 +2,7 @@
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
 
-use glam::{Mat4, Vec3};
+use glam::{vec2, vec3, vec4, Mat4, Vec2, Vec3, Vec4};
 
 use encase::ShaderType;
 
@@ -98,22 +98,38 @@ impl AntiAliasingUniform {
 #[derive(ShaderType)]
 pub struct CameraUniform {
     pos: Vec3,
-    view_proj: Mat4,
-    inverse_view_proj: Mat4,
+    // view_proj: Mat4,
+    // inverse_view_proj: Mat4,
+    // has to be vec4 for correct array stride
+    screen_space_screen_triangle: [Vec4; 3],
+    pos_to_world_space_screen_triangle: [Vec4; 3],
 }
 
 impl CameraUniform {
     pub fn new() -> Self {
         Self {
             pos: Vec3::ZERO,
-            view_proj: Mat4::IDENTITY,
-            inverse_view_proj: Mat4::IDENTITY,
+            // view_proj: Mat4::IDENTITY,
+            // inverse_view_proj: Mat4::IDENTITY,
+            screen_space_screen_triangle: [
+                vec4(3.0, 1.0, 0.0, 0.0),
+                vec4(-1.0, 1.0, 0.0, 0.0),
+                vec4(-1.0, -3.0, 0.0, 0.0),
+            ],
+            // screen_space_screen_triangle: vec2(0.0, 0.0),
+            pos_to_world_space_screen_triangle: [Vec4::ZERO; 3],
         }
     }
     pub fn update(&mut self, camera: &Camera) {
         self.pos = camera.pos;
-        self.view_proj = camera.build_view_projection_matrix();
-        self.inverse_view_proj = self.view_proj.inverse();
+        // self.view_proj = camera.build_view_projection_matrix();
+        // self.inverse_view_proj = self.view_proj.inverse();
+
+        self.pos_to_world_space_screen_triangle = camera
+            .pos_to_world_space_screen_triangle(
+                self.screen_space_screen_triangle.map(|v| vec2(v.x, v.y)),
+            )
+            .map(|v| vec4(v.x, v.y, v.z, 0.0));
     }
 }
 

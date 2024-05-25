@@ -69,7 +69,7 @@ impl Scene {
             dir: (0.0, 0.0, 1.0).into(),
             up: Vec3::Y,
             aspect: config.width as f32 / config.height as f32,
-            fovy: PI * 0.4,
+            fovy: PI * 0.5,
             znear: 0.1,
             zfar: 100.0,
         };
@@ -400,7 +400,8 @@ impl Scene {
             //         ..
             //     } => {
             //         {
-            //             let positions = vec![vec2(3.0, 1.0), vec2(-1.0, 1.0), vec2(-1.0, -3.0)];
+            //             let positions = vec![vec2(3.0, 1.0)];
+            //             // let positions = vec![vec2(3.0, 1.0), vec2(-1.0, 1.0), vec2(-1.0, -3.0)];
             //
             //             println!("{:?}", self.camera.build_view_projection_matrix().inverse());
             //             // println!(
@@ -420,7 +421,11 @@ impl Scene {
             //                 let mut world_pos_hom =
             //                     self.camera.build_view_projection_matrix().inverse() * clip_pos_hom;
             //                 world_pos_hom /= world_pos_hom.w;
-            //                 println!("{:?}", world_pos_hom.xyz() - self.camera.pos);
+            //                 // println!("{:?}", world_pos_hom.xyz() - self.camera.pos);
+            //                 // println!(
+            //                 //     "{:?}",
+            //                 //     self.camera.pos_to_world_space_screen_triangle(pos.x, pos.y)
+            //                 // );
             //             }
             //             true
             //         }
