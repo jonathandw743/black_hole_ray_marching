@@ -260,6 +260,7 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
     let initial_ro_rd_cross = cross(photon.ro, photon.rd);
     let h2 = dot(initial_ro_rd_cross, initial_ro_rd_cross);
     var distance_travelled = 0.0;
+    var has_been_outside_eh = false;
     for (var i = 0; i < MAX_ITERATIONS; i++) {
         // the photon should approach the singularity
         // given the desired distance calculation
@@ -271,6 +272,11 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
                 if dot(photon.rd, photon.ro) < 0.0 {
                     return vec3<f32>(0.0);
                 }
+            }
+            if dist_to_singularity > 1.0 {
+                has_been_outside_eh = true;
+            } else if has_been_outside_eh {
+                return vec3<f32>(0.0);
             }
         }
 
@@ -284,9 +290,9 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
         // we say that if a photon hits this sphere, it goes into temporary orbit around the black hole
         // https://upload.wikimedia.org/wikipedia/commons/2/27/Black_Hole_Shadow.gif
         let photon_sphere_dist = sdf_sphere(photon.ro, -normalize(initial_photon.ro) * 1.5 * u.RS, 0.075);
-        if photon_sphere_dist < MIN_DIST {
-            return vec3<f32>(1.0, 1.0, 0.0);
-        }
+        //if photon_sphere_dist < MIN_DIST {
+        //    return vec3<f32>(1.0, 1.0, 0.0);
+        //}
 
         let dist = min(dist_to_surfaces, photon_sphere_dist);
 
