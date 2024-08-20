@@ -1,19 +1,17 @@
-use winit::{
-    event::*,
-};
+use winit::{event::*, keyboard::KeyCode};
 
-pub fn number_from_virtual_key_code(virtual_key_code: &VirtualKeyCode) -> Option<usize> {
+pub fn number_from_virtual_key_code(virtual_key_code: &KeyCode) -> Option<usize> {
     match virtual_key_code {
-        VirtualKeyCode::Key0 => Some(0),
-        VirtualKeyCode::Key1 => Some(1),
-        VirtualKeyCode::Key2 => Some(2),
-        VirtualKeyCode::Key3 => Some(3),
-        VirtualKeyCode::Key4 => Some(4),
-        VirtualKeyCode::Key5 => Some(5),
-        VirtualKeyCode::Key6 => Some(6),
-        VirtualKeyCode::Key7 => Some(7),
-        VirtualKeyCode::Key8 => Some(8),
-        VirtualKeyCode::Key9 => Some(9),
+        KeyCode::Digit0 => Some(0),
+        KeyCode::Digit1 => Some(1),
+        KeyCode::Digit2 => Some(2),
+        KeyCode::Digit3 => Some(3),
+        KeyCode::Digit4 => Some(4),
+        KeyCode::Digit5 => Some(5),
+        KeyCode::Digit6 => Some(6),
+        KeyCode::Digit7 => Some(7),
+        KeyCode::Digit8 => Some(8),
+        KeyCode::Digit9 => Some(9),
         _ => None,
     }
 }
@@ -70,7 +68,6 @@ pub struct SettingsController {
     // pub anti_aliasing_modifier_pressed: bool,
     pub max_frame_rate_modifier_pressed: bool,
     // pub optical_density_modifier_pressed: bool,
-
     pub number_just_pressed: Option<u8>,
 }
 
@@ -80,7 +77,6 @@ impl SettingsController {
             // anti_aliasing_modifier_pressed: false,
             max_frame_rate_modifier_pressed: false,
             // optical_density_modifier_pressed: false,
-
             number_just_pressed: None,
         }
     }
@@ -102,8 +98,7 @@ impl SettingsController {
                 };
                 // if the event is a number key press, set the number just pressed to that number
                 if !is_pressed {
-                    if let Some(number) = number_from_virtual_key_code(virtual_keycode)
-                    {
+                    if let Some(number) = number_from_virtual_key_code(virtual_keycode) {
                         self.number_just_pressed = Some(number as u8);
                         return true;
                     }
