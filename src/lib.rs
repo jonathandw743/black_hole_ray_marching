@@ -28,8 +28,8 @@ mod smart_include;
 //mod vertex;
 //mod vertices;
 
-//mod state;
-//use state::State;
+mod state;
+use state::State;
 
 pub fn create_window() -> (Window, EventLoop<()>) {
     //cfg_if! {
@@ -77,15 +77,15 @@ pub async fn run() {
     //return;
 
     // State::new uses async code, so we're going to wait for it to finish
-    // let mut state = State::new(window).await;
+    let mut state = State::new(window).await;
 
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::WindowEvent {
                 ref event,
                 window_id,
-            } /* if window_id == state.window().id() */ => {
-                //state.input(event);
+            } if window_id == state.window().id() => {
+                state.input(event);
                 match event {
                     // close the window is the cross or Esc is clicked or pressed
                     WindowEvent::CloseRequested
@@ -98,45 +98,45 @@ pub async fn run() {
                             },
                         ..
                     } => *control_flow = ControlFlow::Exit,
-                    WindowEvent::Resized(physical_size) => {
-                        //state.resize(*physical_size);
-                    }
-                    WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                        // new_inner_size is &&mut so w have to dereference it twice
-                        //state.resize(**new_inner_size);
-                    }
+                    //WindowEvent::Resized(physical_size) => {
+                    //    state.resize(*physical_size);
+                    //}
+                    //WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                    //    // new_inner_size is &&mut so w have to dereference it twice
+                    //    state.resize(**new_inner_size);
+                    //}
                     _ => {}
                 }
             }
-            //Event::RedrawRequested(window_id) if window_id == state.window().id() => {
-            //    // state.render();
-            //    match state.render() {
-            //        Ok(_) => {}
-            //        // Reconfigure the surface if it's lost or outdated
-            //        Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-            //            state.resize(state.size)
-            //        }
-            //        // The system is out of memory, we should probably quit
-            //        Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-            //
-            //        Err(wgpu::SurfaceError::Timeout) => log::warn!("Surface timeout"),
-            //    }
-            //    state.update();
-            //    state.sleep();
-            //
-            //    // if state.frame_number == 5 {
-            //    //     *control_flow = ControlFlow::Exit;
-            //    // }
-            //}
-            //Event::RedrawEventsCleared => {
-            //    // RedrawRequested will only trigger once, unless we manually
-            //    // request it.
-            //    state.window().request_redraw();
-            //}
-            //Event::LoopDestroyed => {
-            //    // println!("hello ended");
-            //    // flame::dump_html(&mut std::fs::File::create("flame-graph.html").unwrap()).unwrap();
-            //}
+            Event::RedrawRequested(window_id) if window_id == state.window().id() => {
+                // state.render();
+                match state.render() {
+                    Ok(_) => {}
+                    // Reconfigure the surface if it's lost or outdated
+                    Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                        state.resize(state.size)
+                    }
+                    // The system is out of memory, we should probably quit
+                    Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
+
+                    Err(wgpu::SurfaceError::Timeout) => log::warn!("Surface timeout"),
+                }
+                //state.update();
+                //state.sleep();
+
+                // if state.frame_number == 5 {
+                //     *control_flow = ControlFlow::Exit;
+                // }
+            }
+            Event::RedrawEventsCleared => {
+                // RedrawRequested will only trigger once, unless we manually
+                // request it.
+                state.window().request_redraw();
+            }
+            Event::LoopDestroyed => {
+                // println!("hello ended");
+                // flame::dump_html(&mut std::fs::File::create("flame-graph.html").unwrap()).unwrap();
+            }
             _ => {}
         }
     });

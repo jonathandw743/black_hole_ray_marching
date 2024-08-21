@@ -4,18 +4,18 @@ use winit::dpi::PhysicalPosition;
 use winit::window::Fullscreen;
 use winit::{event::*, window::Window};
 
-use crate::bloom::Bloom;
-use crate::downsampling::{self, Downsampling};
-use crate::time_replacement::{Duration, Instant};
-use crate::upsampling::Upsampling;
-use std::thread::sleep;
-
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
-
-use crate::settings::{Settings, SettingsController};
-
-use crate::scene::Scene;
+//use crate::bloom::Bloom;
+//use crate::downsampling::{self, Downsampling};
+//use crate::time_replacement::{Duration, Instant};
+//use crate::upsampling::Upsampling;
+//use std::thread::sleep;
+//
+//#[cfg(target_arch = "wasm32")]
+//use wasm_bindgen::prelude::*;
+//
+//use crate::settings::{Settings, SettingsController};
+//
+//use crate::scene::Scene;
 
 pub struct State {
     // wgpu and winit setup
@@ -25,24 +25,23 @@ pub struct State {
     pub config: wgpu::SurfaceConfiguration,
     pub size: winit::dpi::PhysicalSize<u32>,
     pub window: Window,
+    //pub settings: Settings,
+    //pub settings_controller: SettingsController,
 
-    pub settings: Settings,
-    pub settings_controller: SettingsController,
-
-    pub scene: Scene,
+    //pub scene: Scene,
     // pub blur: Blur,
-    pub bloom: Bloom<{ Self::LEVELS }>,
-    pub downsampling: Downsampling<{ Self::LEVELS }>,
-    pub upsampling: Upsampling<{ Self::LEVELS }>,
+    //pub bloom: Bloom<{ Self::LEVELS }>,
+    //pub downsampling: Downsampling<{ Self::LEVELS }>,
+    //pub upsampling: Upsampling<{ Self::LEVELS }>,
 
     // timing
-    pub start_of_last_frame_instant: Instant,
-    pub delta_time: Duration,
+    //pub start_of_last_frame_instant: Instant,
+    //pub delta_time: Duration,
 
-    pub prev_cursor_position: Option<PhysicalPosition<f64>>,
-    pub cursor_position: Option<PhysicalPosition<f64>>,
+    //pub prev_cursor_position: Option<PhysicalPosition<f64>>,
+    //pub cursor_position: Option<PhysicalPosition<f64>>,
 
-    pub frame_number: u32,
+    //pub frame_number: u32,
 }
 
 impl State {
@@ -117,25 +116,25 @@ impl State {
         };
         surface.configure(&device, &config);
 
-        let settings = Settings::new();
-
-        let settings_controller = SettingsController::new();
-
-        surface.configure(&device, &config);
-
-        let scene = Scene::new(&device, &queue, &config, false);
-
-        // let blur = Blur::new(&device, &queue, &config, &scene.output_texture_view);
-
-        let bloom = Bloom::new(&device, &config);
-
-        let downsampling = Downsampling::new(&device, &config);
-        let upsampling = Upsampling::new(&device, &config, &downsampling.textures);
-        // time stuff
-
-        let last_frame_time = Instant::now();
-
-        let delta_time = Duration::from_secs_f32(0.0);
+        //let settings = Settings::new();
+        //
+        //let settings_controller = SettingsController::new();
+        //
+        //surface.configure(&device, &config);
+        //
+        //let scene = Scene::new(&device, &queue, &config, false);
+        //
+        //// let blur = Blur::new(&device, &queue, &config, &scene.output_texture_view);
+        //
+        //let bloom = Bloom::new(&device, &config);
+        //
+        //let downsampling = Downsampling::new(&device, &config);
+        //let upsampling = Upsampling::new(&device, &config, &downsampling.textures);
+        //// time stuff
+        //
+        //let last_frame_time = Instant::now();
+        //
+        //let delta_time = Duration::from_secs_f32(0.0);
 
         Self {
             surface,
@@ -144,23 +143,22 @@ impl State {
             config,
             size,
             window,
-
-            settings,
-            settings_controller,
-
-            scene,
-
-            // blur,
-            bloom,
-            downsampling,
-            upsampling,
-            start_of_last_frame_instant: last_frame_time,
-            delta_time,
-
-            prev_cursor_position: None,
-            cursor_position: None,
-
-            frame_number: 0,
+            //settings,
+            //settings_controller,
+            //
+            //scene,
+            //
+            //// blur,
+            //bloom,
+            //downsampling,
+            //upsampling,
+            //start_of_last_frame_instant: last_frame_time,
+            //delta_time,
+            //
+            //prev_cursor_position: None,
+            //cursor_position: None,
+            //
+            //frame_number: 0,
         }
     }
 
@@ -174,17 +172,17 @@ impl State {
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
-            self.scene.resize(&self.device, &self.queue, &self.config);
-            self.bloom.resize(&self.device, &self.config);
+            //self.scene.resize(&self.device, &self.queue, &self.config);
+            //self.bloom.resize(&self.device, &self.config);
             // self.downsampling.resize(&self.device, &self.config);
-            self.downsampling.resize(&self.device, &self.config);
+            //self.downsampling.resize(&self.device, &self.config);
         }
     }
 
     fn process_event(&mut self, event: &WindowEvent) -> bool {
         match event {
             &WindowEvent::CursorMoved { position, .. } => {
-                self.cursor_position = Some(position);
+                //self.cursor_position = Some(position);
                 true
             }
             WindowEvent::KeyboardInput {
@@ -210,30 +208,30 @@ impl State {
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
         [
-            self.settings_controller.process_event(event),
-            self.scene.process_event(event, &self.queue),
+            //self.settings_controller.process_event(event),
+            //self.scene.process_event(event, &self.queue),
             self.process_event(event),
         ]
         .iter()
         .any(|&result| result)
     }
 
-    pub fn update(&mut self) {
-        self.delta_time = self.start_of_last_frame_instant.elapsed();
-        self.start_of_last_frame_instant += self.delta_time;
-        // update controllers
-        self.settings_controller.update_settings(&mut self.settings);
-        self.scene.update(
-            self.delta_time,
-            self.prev_cursor_position,
-            self.cursor_position,
-            &self.queue,
-        );
-        self.prev_cursor_position = self.cursor_position;
-    }
+    //pub fn update(&mut self) {
+    //    self.delta_time = self.start_of_last_frame_instant.elapsed();
+    //    self.start_of_last_frame_instant += self.delta_time;
+    //    // update controllers
+    //    self.settings_controller.update_settings(&mut self.settings);
+    //    self.scene.update(
+    //        self.delta_time,
+    //        self.prev_cursor_position,
+    //        self.cursor_position,
+    //        &self.queue,
+    //    );
+    //    self.prev_cursor_position = self.cursor_position;
+    //}
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        let render_start = Instant::now();
+        //let render_start = Instant::now();
 
         let output = self.surface.get_current_texture()?;
         let output_view = output
@@ -246,15 +244,15 @@ impl State {
                 label: Some("scene Render Encoder"),
             });
 
-        self.scene.render(
-            &mut encoder,
-            // Some(self.bloom.input_texture_view()),
-            // Some(self.bloom.input_texture_view()),
-            // None,
-            Some(&output_view),
-            // Some(self.downsampling.input_texture_view()),
-            None,
-        );
+        //self.scene.render(
+        //    &mut encoder,
+        //    // Some(self.bloom.input_texture_view()),
+        //    // Some(self.bloom.input_texture_view()),
+        //    // None,
+        //    Some(&output_view),
+        //    // Some(self.downsampling.input_texture_view()),
+        //    None,
+        //);
 
         // self.bloom.render(&mut encoder, Some(&output_view));
         // self.downsampling
@@ -267,27 +265,27 @@ impl State {
 
         output.present();
 
-        let render_time = Instant::now() - render_start;
-        if self.frame_number % 100 == 0 {
-            dbg!(render_time);
-        }
-
-        self.frame_number += 1;
+        //let render_time = Instant::now() - render_start;
+        //if self.frame_number % 100 == 0 {
+        //    dbg!(render_time);
+        //}
+        //
+        //self.frame_number += 1;
 
         Ok(())
     }
 
-    pub fn sleep(&mut self) {
-        let current_frame_duration = self.start_of_last_frame_instant.elapsed();
-        if let Some(max_frame_rate) = self.settings.max_frame_rate {
-            #[cfg(not(target_arch = "wasm32"))] // can't sleep normally in wasm
-            {
-                let min_frame_duration = Duration::from_secs_f32(1.0 / max_frame_rate);
-                if current_frame_duration < min_frame_duration {
-                    let sleep_duration = min_frame_duration - current_frame_duration;
-                    sleep(sleep_duration);
-                }
-            }
-        }
-    }
+    //pub fn sleep(&mut self) {
+    //    let current_frame_duration = self.start_of_last_frame_instant.elapsed();
+    //    if let Some(max_frame_rate) = self.settings.max_frame_rate {
+    //        #[cfg(not(target_arch = "wasm32"))] // can't sleep normally in wasm
+    //        {
+    //            let min_frame_duration = Duration::from_secs_f32(1.0 / max_frame_rate);
+    //            if current_frame_duration < min_frame_duration {
+    //                let sleep_duration = min_frame_duration - current_frame_duration;
+    //                sleep(sleep_duration);
+    //            }
+    //        }
+    //    }
+    //}
 }
