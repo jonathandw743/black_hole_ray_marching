@@ -1,6 +1,8 @@
 use std::iter;
-use wgpu::InstanceFlags;
+use std::sync::Arc;
+use wgpu::{Device, Instance, InstanceFlags, Queue, Surface, SurfaceConfiguration};
 use winit::dpi::PhysicalPosition;
+use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::Fullscreen;
 use winit::{event::*, window::Window};
 
@@ -17,23 +19,25 @@ use crate::settings::{Settings, SettingsController};
 
 use crate::scene::Scene;
 
-pub struct State {
-    // wgpu and winit setup
-    pub surface: wgpu::Surface,
-    pub device: wgpu::Device,
-    pub queue: wgpu::Queue,
-    pub config: wgpu::SurfaceConfiguration,
-    pub size: winit::dpi::PhysicalSize<u32>,
-    pub window: Window,
+const LEVELS: usize = 3;
 
+pub struct State<'a> {
+    // wgpu and winit setup
+    pub window: Arc<Window>,
+    pub surface: Surface<'a>,
+    pub device: Device,
+    pub queue: Queue,
+    pub config: SurfaceConfiguration,
+
+    // pub size: winit::dpi::PhysicalSize<u32>,
     pub settings: Settings,
     pub settings_controller: SettingsController,
 
     pub scene: Scene,
     // pub blur: Blur,
-    pub bloom: Bloom<{ Self::LEVELS }>,
-    pub downsampling: Downsampling<{ Self::LEVELS }>,
-    pub upsampling: Upsampling<{ Self::LEVELS }>,
+    pub bloom: Bloom<{ LEVELS }>,
+    pub downsampling: Downsampling<{ LEVELS }>,
+    pub upsampling: Upsampling<{ LEVELS }>,
 
     // timing
     pub start_of_last_frame_instant: Instant,
@@ -45,76 +49,49 @@ pub struct State {
     pub frame_number: u32,
 }
 
-impl State {
-    const LEVELS: usize = 3;
-
+impl State<'_> {
     pub async fn new(window: Window) -> Self {
-        let size = window.inner_size();
-        let x = 3.0;
+        let window = Arc::new(window);
 
-        // The instance is a handle to our GPU
-        // BackendBit::PRIMARY => Vulkan + Metal + DX12 + Browser WebGPU
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
-            dx12_shader_compiler: Default::default(),
-            flags: InstanceFlags::empty(),
-            gles_minor_version: wgpu::Gles3MinorVersion::Automatic,
-        });
+        let mut size = window.inner_size();
+        size.width = size.width.max(1);
+        size.height = size.height.max(1);
 
-        // # Safety
-        //
-        // The surface needs to live as long as the window that created it.
-        // State owns the window so this should be safe.
-        let surface = unsafe { instance.create_surface(&window) }.unwrap();
+        let instance = Instance::default();
 
+        let surface = instance.create_surface(Arc::clone(&window)).unwrap();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
-                compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
+                // Request an adapter which can render to our surface
+                compatible_surface: Some(&surface),
             })
             .await
-            .unwrap();
+            .expect("Failed to find an appropriate adapter");
 
+        // Create the logical device and command queue
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    features: wgpu::Features::empty(),
-                    // WebGL doesn't support all of wgpu's features, so if
-                    // we're building for the web we'll have to disable some.
-                    limits: if cfg!(target_arch = "wasm32") {
-                        wgpu::Limits::downlevel_webgl2_defaults()
-                    } else {
-                        wgpu::Limits::default()
-                    },
+                    required_features: wgpu::Features::empty(),
+                    // Make sure we use the texture resolution limits from the adapter, so we can support images the size of the swapchain.
+                    required_limits: wgpu::Limits::downlevel_webgl2_defaults()
+                        .using_resolution(adapter.limits()),
+                    memory_hints: wgpu::MemoryHints::MemoryUsage,
                 },
-                // Some(&std::path::Path::new("trace")), // Trace path
                 None,
             )
             .await
-            .unwrap();
+            .expect("Failed to create device");
 
-        let surface_caps = surface.get_capabilities(&adapter);
-        // Shader code in this tutorial assumes an Srgb surface texture. Using a different
-        // one will result all the colors comming out darker. If you want to support non
-        // Srgb surfaces, you'll need to account for that when drawing to the frame.
-        let surface_format = surface_caps
-            .formats
-            .iter()
-            .copied()
-            .filter(|f| f.is_srgb())
-            .next()
-            .unwrap_or(surface_caps.formats[0]);
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width: size.width,
-            height: size.height,
-            present_mode: surface_caps.present_modes[0],
-            alpha_mode: surface_caps.alpha_modes[0],
-            view_formats: vec![],
-        };
+        let swapchain_capabilities = surface.get_capabilities(&adapter);
+        let swapchain_format = swapchain_capabilities.formats[0];
+
+        let config = surface
+            .get_default_config(&adapter, size.width, size.height)
+            .unwrap();
         surface.configure(&device, &config);
 
         let settings = Settings::new();
@@ -142,7 +119,7 @@ impl State {
             device,
             queue,
             config,
-            size,
+            // size,
             window,
 
             settings,
@@ -168,9 +145,9 @@ impl State {
         &self.window
     }
 
-    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+    pub fn resize(&mut self, new_size: &winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
-            self.size = new_size;
+            // self.size = new_size;
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
@@ -181,22 +158,32 @@ impl State {
         }
     }
 
-    fn process_event(&mut self, event: &WindowEvent) -> bool {
+    pub fn process_event(&mut self, event: &WindowEvent) -> bool {
+        self.scene.process_event(event, &self.queue);
+        self.settings_controller.process_event(event);
         match event {
-            &WindowEvent::CursorMoved { position, .. } => {
-                self.cursor_position = Some(position);
-                true
+            WindowEvent::Resized(new_size) => {
+                self.resize(new_size);
+                // On macos the window needs to be redrawn manually after resizing
+                let _ = self.render();
+                false
+            }
+            WindowEvent::RedrawRequested => {
+                self.update();
+                let _ = self.render();
+                self.sleep();
+                false
             }
             WindowEvent::KeyboardInput {
-                input:
-                    KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(KeyCode::F11),
                         state: ElementState::Pressed,
-                        virtual_keycode: Some(VirtualKeyCode::F11),
                         ..
                     },
                 ..
             } => {
-                if let Some(_) = self.window().fullscreen() {
+                if let Some(_) = self.window.fullscreen() {
                     self.window.set_fullscreen(None);
                 } else {
                     self.window
@@ -208,15 +195,15 @@ impl State {
         }
     }
 
-    pub fn input(&mut self, event: &WindowEvent) -> bool {
-        [
-            self.settings_controller.process_event(event),
-            self.scene.process_event(event, &self.queue),
-            self.process_event(event),
-        ]
-        .iter()
-        .any(|&result| result)
-    }
+    // pub fn input(&mut self, event: &WindowEvent) -> bool {
+    //     [
+    //         self.settings_controller.process_event(event),
+    //         self.scene.process_event(event, &self.queue),
+    //         self.process_event(event),
+    //     ]
+    //     .iter()
+    //     .any(|&result| result)
+    // }
 
     pub fn update(&mut self) {
         self.delta_time = self.start_of_last_frame_instant.elapsed();
@@ -273,6 +260,8 @@ impl State {
         }
 
         self.frame_number += 1;
+
+        self.window.request_redraw();
 
         Ok(())
     }

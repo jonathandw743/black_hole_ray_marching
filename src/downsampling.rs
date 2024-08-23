@@ -72,6 +72,7 @@ impl<const LEVELS: usize> Downsampling<LEVELS> {
                     module: &screen_triangle_shader_module,
                     entry_point: "main",
                     buffers: &[],
+                    compilation_options: Default::default(),
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &downsample_shader_module,
@@ -81,6 +82,7 @@ impl<const LEVELS: usize> Downsampling<LEVELS> {
                         blend: Some(wgpu::BlendState::REPLACE),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
+                    compilation_options: Default::default(),
                 }),
                 primitive: wgpu::PrimitiveState {
                     topology: wgpu::PrimitiveTopology::TriangleList,
@@ -98,6 +100,7 @@ impl<const LEVELS: usize> Downsampling<LEVELS> {
                     alpha_to_coverage_enabled: false,
                 },
                 multiview: None,
+                cache: None
             });
 
         Self {

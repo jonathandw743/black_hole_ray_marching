@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use winit::{dpi::PhysicalPosition, event::*};
+use winit::{dpi::PhysicalPosition, event::*, keyboard::{KeyCode, PhysicalKey}};
 
 // use cgmath::prelude::*;
 
@@ -185,10 +185,10 @@ impl CameraController {
                 true
             }
             WindowEvent::KeyboardInput {
-                input:
-                    KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(code),
                         state,
-                        virtual_keycode: Some(virtual_keycode),
                         ..
                     },
                 ..
@@ -197,64 +197,64 @@ impl CameraController {
                     ElementState::Pressed => true,
                     ElementState::Released => false,
                 };
-                match virtual_keycode {
-                    VirtualKeyCode::W => {
+                match code {
+                    KeyCode::KeyW => {
                         self.is_forward_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::A => {
+                    KeyCode::KeyA => {
                         self.is_left_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::S => {
+                    KeyCode::KeyS => {
                         self.is_backward_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::D => {
+                    KeyCode::KeyD => {
                         self.is_right_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::Up => {
+                    KeyCode::ArrowUp => {
                         self.is_pan_up_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::Left => {
+                    KeyCode::ArrowLeft => {
                         self.is_pan_left_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::Down => {
+                    KeyCode::ArrowDown => {
                         self.is_pan_down_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::Right => {
+                    KeyCode::ArrowRight => {
                         self.is_pan_right_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::P => {
+                    KeyCode::KeyP => {
                         self.is_exp_towards_origin_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::O => {
+                    KeyCode::KeyO => {
                         self.is_exp_away_origin_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::Right => {
-                        self.is_exp_away_origin_pressed = is_pressed;
-                        true
-                    }
-                    VirtualKeyCode::Space => {
+                    // VirtualKeyCode::Right => {
+                    //     self.is_exp_away_origin_pressed = is_pressed;
+                    //     true
+                    // }
+                    KeyCode::Space => {
                         self.is_up_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::F => {
+                    KeyCode::KeyF => {
                         self.is_down_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::Q => {
+                    KeyCode::KeyQ => {
                         self.speed /= 1.5;
                         true
                     }
-                    VirtualKeyCode::E => {
+                    KeyCode::KeyE => {
                         self.speed *= 1.5;
                         true
                     }
@@ -307,7 +307,10 @@ impl CameraController {
         camera.pos += z_movement * camera.dir;
         camera.pos += y_movement * camera.up;
 
-        let exp_towards_away_origin_norm = match (self.is_exp_towards_origin_pressed, self.is_exp_away_origin_pressed) {
+        let exp_towards_away_origin_norm = match (
+            self.is_exp_towards_origin_pressed,
+            self.is_exp_away_origin_pressed,
+        ) {
             (false, false) => 0.0,
             (false, true) => 1.0,
             (true, false) => -1.0,

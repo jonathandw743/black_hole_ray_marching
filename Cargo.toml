@@ -12,11 +12,11 @@ crate-type = ["cdylib", "rlib"]
 #idk, take this out for building to wasm because thread-id doesn't have a get_internal for the wasm architecture
 # flame = "0.2.2"
 
-winit = "0.27"
-env_logger = "0.10"
+winit = "0.30.5"
+env_logger = "0.11.5"
 log = "0.4"
-wgpu = "0.18"
-pollster = "0.2"
+wgpu = "22.1.0"
+pollster = "0.3.0"
 bytemuck = { version = "1.12", features = [ "derive" ] }
 anyhow = "1.0"
 aligned = "0.4.1"
@@ -33,7 +33,7 @@ features = ["png", "jpeg"]
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"
 console_log = "1.0.0"
-wgpu = { version = "0.18", features = ["webgl"]}
+wgpu = { version = "22.1.0", features = ["webgl"]}
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 web-sys = { version = "0.3", features = [

@@ -11,13 +11,14 @@ use crate::{
 
 use glam::{uvec2, vec2, vec3, vec4, UVec2, Vec2, Vec3, Vec4Swizzles};
 
-use std::f32::consts::PI;
+use std::{default, f32::consts::PI};
 
 use wgpu::util::DeviceExt;
 
 use winit::{
     dpi::PhysicalPosition,
-    event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent},
+    event::{ElementState, WindowEvent},
+    keyboard::KeyCode,
 };
 
 use cfg_if::cfg_if;
@@ -86,8 +87,8 @@ impl Scene {
         });
 
         let other_uniforms = OtherUniforms::new(
-            VirtualKeyCode::PageUp,
-            VirtualKeyCode::PageDown,
+            KeyCode::PageUp,
+            KeyCode::PageDown,
             [
                 OtherUniform {
                     label: "swartschild radius".into(),
@@ -250,6 +251,7 @@ impl Scene {
                 module: &black_hole_shader,
                 entry_point: "vs_main",
                 buffers: &[],
+                compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &black_hole_shader,
@@ -270,6 +272,7 @@ impl Scene {
                         None
                     },
                 ],
+                compilation_options: Default::default(),
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -287,6 +290,7 @@ impl Scene {
                 alpha_to_coverage_enabled: false,
             },
             multiview: None,
+            cache: None,
         });
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

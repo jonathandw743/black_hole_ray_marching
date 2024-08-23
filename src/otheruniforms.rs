@@ -5,7 +5,7 @@ use encase::{
     internal::{WriteInto, Writer},
     ShaderType,
 };
-use winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::{event::{ElementState, KeyEvent, WindowEvent}, keyboard::{KeyCode, PhysicalKey}};
 
 use crate::settings::number_from_virtual_key_code;
 
@@ -83,16 +83,16 @@ where
 // mental gymnastics ends
 
 pub struct OtherUniforms<const N: usize> {
-    pub positive_modifier_key_code: VirtualKeyCode,
-    pub negative_modifier_key_code: VirtualKeyCode,
+    pub positive_modifier_key_code: KeyCode,
+    pub negative_modifier_key_code: KeyCode,
     pub other_uniforms: [OtherUniform; N],
     pub modifier_number_pressed: Option<usize>,
 }
 
 impl<const N: usize> OtherUniforms<N> {
     pub fn new(
-        positive_modifier_key_code: VirtualKeyCode,
-        negative_modifier_key_code: VirtualKeyCode,
+        positive_modifier_key_code: KeyCode,
+        negative_modifier_key_code: KeyCode,
         other_uniforms: [OtherUniform; N],
     ) -> Self {
         Self {
@@ -119,10 +119,10 @@ impl<const N: usize> OtherUniforms<N> {
     pub fn process_event(&mut self, event: &WindowEvent) -> bool {
         match event {
             WindowEvent::KeyboardInput {
-                input:
-                    KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(code),
                         state,
-                        virtual_keycode: Some(virtual_key_code),
                         ..
                     },
                 ..
@@ -134,7 +134,7 @@ impl<const N: usize> OtherUniforms<N> {
                 if !is_pressed {
                     return false;
                 }
-                if let Some(number) = number_from_virtual_key_code(virtual_key_code) {
+                if let Some(number) = number_from_virtual_key_code(code) {
                     self.modifier_number_pressed = Some(number);
                     println!(
                         "{}",
@@ -147,11 +147,11 @@ impl<const N: usize> OtherUniforms<N> {
                 }
                 if let Some(modifier_number) = self.modifier_number_pressed {
                     if modifier_number < N {
-                        if *virtual_key_code == self.positive_modifier_key_code {
+                        if *code == self.positive_modifier_key_code {
                             self.other_uniforms[modifier_number].inc_value.increment();
                             return true;
                         }
-                        if *virtual_key_code == self.negative_modifier_key_code {
+                        if *code == self.negative_modifier_key_code {
                             self.other_uniforms[modifier_number].inc_value.decrement();
                             return true;
                         }

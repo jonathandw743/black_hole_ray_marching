@@ -104,6 +104,7 @@ impl<const LEVELS: usize> Bloom<LEVELS> {
                     module: &screen_triangle_shader_module,
                     entry_point: "main",
                     buffers: &[],
+                    compilation_options: Default::default(),
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &final_remix_shader_module,
@@ -113,6 +114,7 @@ impl<const LEVELS: usize> Bloom<LEVELS> {
                         blend: Some(wgpu::BlendState::REPLACE),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
+                    compilation_options: Default::default(),
                 }),
                 primitive: wgpu::PrimitiveState {
                     topology: wgpu::PrimitiveTopology::TriangleList,
@@ -130,6 +132,7 @@ impl<const LEVELS: usize> Bloom<LEVELS> {
                     alpha_to_coverage_enabled: false,
                 },
                 multiview: None,
+                cache: None,
             });
 
         Self {

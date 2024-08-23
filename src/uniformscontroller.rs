@@ -8,7 +8,7 @@
 
 // use cgmath::num_traits::float;
 
-use winit::{event::*};
+use winit::{event::*, keyboard::{KeyCode, PhysicalKey}};
 
 
 
@@ -151,8 +151,8 @@ where
     pub uniform: UniformAndBuffer<UniformType>,
     pub increment: IncrementType,
     // pub decrement: UniformType,
-    pub positive_modifier_key_code: VirtualKeyCode,
-    pub negative_modifier_key_code: VirtualKeyCode,
+    pub positive_modifier_key_code: KeyCode,
+    pub negative_modifier_key_code: KeyCode,
     // pub
 }
 
@@ -171,10 +171,10 @@ where
     fn process_event(&mut self, event: &WindowEvent, queue: &wgpu::Queue, logging: bool) -> bool {
         match event {
             WindowEvent::KeyboardInput {
-                input:
-                    KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(code),
                         state,
-                        virtual_keycode: Some(virtual_key_code),
                         ..
                     },
                 ..
@@ -186,11 +186,11 @@ where
                 if !is_pressed {
                     return false;
                 }
-                if *virtual_key_code == self.positive_modifier_key_code {
+                if *code == self.positive_modifier_key_code {
                     self.uniform.increment(&self.increment, queue, logging);
                     return true;
                 }
-                if *virtual_key_code == self.negative_modifier_key_code {
+                if *code == self.negative_modifier_key_code {
                     self.uniform.increment(&self.increment.opposite(), queue, logging);
                     return true;
                 }
@@ -269,10 +269,10 @@ impl<const N: usize> UniformControllerGroup<N> {
     pub fn process_event(&mut self, event: &WindowEvent, queue: &wgpu::Queue) -> bool {
         match event {
             WindowEvent::KeyboardInput {
-                input:
-                    KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(code),
                         state,
-                        virtual_keycode: Some(virtual_key_code),
                         ..
                     },
                 ..
@@ -284,7 +284,7 @@ impl<const N: usize> UniformControllerGroup<N> {
                 if !is_pressed {
                     return false;
                 }
-                if let Some(number) = number_from_virtual_key_code(virtual_key_code) {
+                if let Some(number) = number_from_virtual_key_code(code) {
                     self.modifier_number_pressed = Some(number);
                     return true;
                 }
