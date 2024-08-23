@@ -80,7 +80,10 @@ impl ApplicationHandler for App<'_> {
         self.app_state = Some(block_on(State::new(window)));
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
+        if !self.app_state.as_ref().map_or(false, |app_state| app_state.window.id() == id) {
+            return;
+        }
         if let Some(app_state) = self.app_state.as_mut() {
             let _ = app_state.process_event(&event);
         }
