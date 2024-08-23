@@ -206,6 +206,7 @@ impl State<'_> {
     // }
 
     pub fn update(&mut self) {
+        dbg!(self.prev_cursor_position, self.cursor_position);
         self.delta_time = self.start_of_last_frame_instant.elapsed();
         self.start_of_last_frame_instant += self.delta_time;
         // update controllers
