@@ -49,7 +49,10 @@ struct App<'a> {
 
 impl ApplicationHandler for App<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let window_attrs = Window::default_attributes();
+        let window_attrs = Window::default_attributes().with_inner_size(PhysicalSize {
+            width: 1280,
+            height: 720,
+        });
         let window = event_loop
             .create_window(window_attrs)
             .expect("Couldn't create window.");
