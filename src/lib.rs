@@ -74,7 +74,7 @@ impl ApplicationHandler for App<'_> {
 
             // Winit prevents sizing with CSS, so we have to set
             // the size manually when on web.
-            let _ = window.request_inner_size(PhysicalSize::new(450, 400));
+            let _ = window.request_inner_size(PhysicalSize::new(1280, 720));
         }
 
         self.app_state = Some(block_on(State::new(window)));
