@@ -129,6 +129,8 @@ impl<const LEVELS: usize> Downsampling<LEVELS> {
         let mut dim = (config.width, config.height);
         // add all the texture to the array
         for level in 0..LEVELS {
+            dim.0 = dim.0.max(1);
+            dim.1 = dim.1.max(1);
             // create the texture
             let texture = device.create_texture(&wgpu::TextureDescriptor {
                 label: Some(&format!("downsample texture {}", level)),

@@ -147,9 +147,11 @@ impl<const LEVELS: usize> Upsampling<LEVELS> {
         for level in 0..LEVELS {
             // ammend the dimension
             dim = (dim.0 / 2, dim.1 / 2);
+            dim.0 = dim.0.max(1);
+            dim.1 = dim.1.max(1);
             // create the texture
             let texture = device.create_texture(&wgpu::TextureDescriptor {
-                label: Some(&format!("downsample texture {}", level)),
+                label: Some(&format!("upsample texture {}", level)),
                 mip_level_count: 1,
                 size: wgpu::Extent3d {
                     width: dim.0,
