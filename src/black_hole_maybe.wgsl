@@ -24,7 +24,7 @@ struct VertexInput {
 }
 
 struct VertexOutput {
-   @invariant @builtin(position) clip_position: vec4<f32>,
+    @invariant @builtin(position) clip_position: vec4<f32>,
     @location(1) camera_to_vertex: vec3<f32>,
 }
 

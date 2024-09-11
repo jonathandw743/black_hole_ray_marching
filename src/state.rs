@@ -19,7 +19,7 @@ use crate::settings::{Settings, SettingsController};
 
 use crate::scene::Scene;
 
-const LEVELS: usize = 3;
+const LEVELS: usize = 2;
 
 pub struct State<'a> {
     // wgpu and winit setup
@@ -38,6 +38,9 @@ pub struct State<'a> {
     pub bloom: Bloom<{ LEVELS }>,
     pub downsampling: Downsampling<{ LEVELS }>,
     pub upsampling: Upsampling<{ LEVELS }>,
+
+    null_texture: wgpu::Texture,
+    null_texture_view: wgpu::TextureView,
 
     // timing
     pub start_of_last_frame_instant: Instant,
@@ -100,7 +103,7 @@ impl State<'_> {
 
         surface.configure(&device, &config);
 
-        let scene = Scene::new(&device, &queue, &config, false);
+        let scene = Scene::new(&device, &queue, &config, true);
 
         // let blur = Blur::new(&device, &queue, &config, &scene.output_texture_view);
 
@@ -113,6 +116,22 @@ impl State<'_> {
         let last_frame_time = Instant::now();
 
         let delta_time = Duration::from_secs_f32(0.0);
+
+        let null_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("null texture"),
+            mip_level_count: 1,
+            size: wgpu::Extent3d {
+                width: 1280,
+                height: 720,
+                depth_or_array_layers: 1,
+            },
+            format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            dimension: wgpu::TextureDimension::D2,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            sample_count: 1,
+            view_formats: &[],
+        });
+        let null_texture_view = null_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         Self {
             surface,
@@ -131,6 +150,10 @@ impl State<'_> {
             bloom,
             downsampling,
             upsampling,
+
+            null_texture,
+            null_texture_view,
+
             start_of_last_frame_instant: last_frame_time,
             delta_time,
 
@@ -240,12 +263,13 @@ impl State<'_> {
 
         self.scene.render(
             &mut encoder,
-            // Some(self.bloom.input_texture_view()),
+            // None,
+            Some(&self.bloom.input_texture_view()),
+            Some(&output_view),
             // Some(self.bloom.input_texture_view()),
             // None,
-            Some(&output_view),
+            // Some(&output_view),
             // Some(self.downsampling.input_texture_view()),
-            None,
         );
 
         // self.bloom.render(&mut encoder, Some(&output_view));

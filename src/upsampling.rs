@@ -142,10 +142,15 @@ impl<const LEVELS: usize> Upsampling<LEVELS> {
         // initialise the textures as a null array
         let mut result = Vec::new();
         // track the dimensions of the current texture
+        // let initial_dim = (config.width as f32, config.height as f32);
         let mut dim = (config.width, config.height);
+        // let levels = LEVELS as f32;
         // add all the texture to the array
         for level in 0..LEVELS {
+            // let level_f = level as f32;
+            // let m = (levels - (level_f + 1.0) * 0.8) / levels;
             // ammend the dimension
+            // let mut dim = ((initial_dim.0 * m) as u32, (initial_dim.1 * m) as u32);
             dim = (dim.0 / 2, dim.1 / 2);
             dim.0 = dim.0.max(1);
             dim.1 = dim.1.max(1);

@@ -90,7 +90,7 @@ impl ApplicationHandler for App<'_> {
         match event {
             WindowEvent::CloseRequested => {
                 println!("The close button was pressed; stopping");
-                event_loop.exit()
+                event_loop.exit();
             }
             _ => {}
         };

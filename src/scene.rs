@@ -342,30 +342,30 @@ impl Scene {
         return resolution_uniform;
     }
 
-    pub fn create_output_texture(
-        device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
-    ) -> (wgpu::Texture, wgpu::TextureView) {
-        let output_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("scene output_texture"),
-            mip_level_count: 1,
-            size: wgpu::Extent3d {
-                width: config.width,
-                height: config.height,
-                depth_or_array_layers: 1,
-            },
-            format: wgpu::TextureFormat::Bgra8UnormSrgb,
-            dimension: wgpu::TextureDimension::D2,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            sample_count: 1,
-            view_formats: &[],
-        });
+    // pub fn create_output_texture(
+    //     device: &wgpu::Device,
+    //     config: &wgpu::SurfaceConfiguration,
+    // ) -> (wgpu::Texture, wgpu::TextureView) {
+    //     let output_texture = device.create_texture(&wgpu::TextureDescriptor {
+    //         label: Some("scene output_texture"),
+    //         mip_level_count: 1,
+    //         size: wgpu::Extent3d {
+    //             width: config.width,
+    //             height: config.height,
+    //             depth_or_array_layers: 1,
+    //         },
+    //         format: wgpu::TextureFormat::Bgra8UnormSrgb,
+    //         dimension: wgpu::TextureDimension::D2,
+    //         usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+    //         sample_count: 1,
+    //         view_formats: &[],
+    //     });
 
-        let output_texture_view =
-            output_texture.create_view(&wgpu::TextureViewDescriptor::default());
+    //     let output_texture_view =
+    //         output_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        return (output_texture, output_texture_view);
-    }
+    //     return (output_texture, output_texture_view);
+    // }
 
     pub fn resize(
         &mut self,
