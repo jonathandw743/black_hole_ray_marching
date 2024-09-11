@@ -19,7 +19,7 @@ use winit::{
 #[macro_use]
 mod smart_include;
 
-mod bloom;
+// mod bloom;
 mod camera;
 mod downsampling;
 mod indices;
@@ -31,10 +31,11 @@ mod texture;
 mod time_replacement;
 mod uniforms;
 mod uniformscontroller;
-mod upsampling;
+// mod upsampling;
 mod vertex;
 mod vertices;
 mod gaussian_blur;
+mod kawase_blur;
 
 mod state;
 use state::State;

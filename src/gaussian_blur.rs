@@ -1,9 +1,9 @@
 use glam::{uvec2, UVec2};
 use wgpu::util::DeviceExt;
 
-use crate::downsampling::Downsampling;
+// use crate::downsampling::Downsampling;
 use crate::otheruniforms::BufferContent;
-use crate::upsampling::Upsampling;
+// use crate::upsampling::Upsampling;
 
 pub struct GaussianBlur {
     pub input_texture: wgpu::Texture,
@@ -36,7 +36,7 @@ impl GaussianBlur {
         let resolution_uniform = uvec2(config.width, config.height);
 
         let resolution_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("camer uniforms"),
+            label: Some("resolution uniform"),
             contents: &resolution_uniform.uniform_buffer_content(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });

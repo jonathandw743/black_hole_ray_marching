@@ -1,16 +1,18 @@
 use std::iter;
 use std::sync::Arc;
+use glam::uvec2;
 use wgpu::{Device, Instance, InstanceFlags, Queue, Surface, SurfaceConfiguration};
 use winit::dpi::PhysicalPosition;
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::Fullscreen;
 use winit::{event::*, window::Window};
 
-use crate::bloom::Bloom;
+// use crate::bloom::Bloom;
 use crate::downsampling::{self, Downsampling};
 use crate::gaussian_blur::GaussianBlur;
+use crate::kawase_blur::{KawaseDownsampling, KawaseUpsampling};
 use crate::time_replacement::{Duration, Instant};
-use crate::upsampling::Upsampling;
+// use crate::upsampling::Upsampling;
 use std::thread::sleep;
 
 #[cfg(target_arch = "wasm32")]
@@ -36,11 +38,14 @@ pub struct State<'a> {
 
     pub scene: Scene,
     // pub blur: Blur,
-    pub bloom: Bloom<{ LEVELS }>,
+    // pub bloom: Bloom<{ LEVELS }>,
     pub downsampling: Downsampling<{ LEVELS }>,
-    pub upsampling: Upsampling<{ LEVELS }>,
+    // pub upsampling: Upsampling<{ LEVELS }>,
 
-    pub gaussian_blur: GaussianBlur,
+    // pub gaussian_blur: GaussianBlur,
+
+    pub kawase_upsampling: KawaseUpsampling,
+    pub kawase_downsampling: KawaseDownsampling,
 
     // timing
     pub start_of_last_frame_instant: Instant,
@@ -107,13 +112,16 @@ impl State<'_> {
 
         // let blur = Blur::new(&device, &queue, &config, &scene.output_texture_view);
 
-        let bloom = Bloom::new(&device, &config);
+        // let bloom = Bloom::new(&device, &config);
 
         let downsampling = Downsampling::new(&device, &config);
-        let upsampling = Upsampling::new(&device, &config, &downsampling.textures);
+        // let upsampling = Upsampling::new(&device, &config, &downsampling.textures);
         // time stuff
 
-        let gaussian_blur = GaussianBlur::new(&device, &config);
+        // let gaussian_blur = GaussianBlur::new(&device, &config);
+
+        let kawase_downsampling = KawaseDownsampling::new(&device, &config);
+        let kawase_upsampling = KawaseUpsampling::new(&device, &config);
 
         let last_frame_time = Instant::now();
 
@@ -133,11 +141,14 @@ impl State<'_> {
             scene,
 
             // blur,
-            bloom,
+            // bloom,
             downsampling,
-            upsampling,
+            // upsampling,
             
-            gaussian_blur,
+            // gaussian_blur,
+
+            kawase_upsampling,
+            kawase_downsampling,
 
             start_of_last_frame_instant: last_frame_time,
             delta_time,
@@ -160,11 +171,14 @@ impl State<'_> {
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
             self.scene.resize(&self.device, &self.queue, &self.config);
-            self.bloom.resize(&self.device, &self.config);
+            // self.bloom.resize(&self.device, &self.config);
             // self.downsampling.resize(&self.device, &self.config);
             self.downsampling.resize(&self.device, &self.config);
 
-            self.gaussian_blur.resize(&self.device, &self.config);
+            self.kawase_downsampling.resize(&self.device, &self.config, &self.queue);
+            self.kawase_upsampling.resize(&self.device, &self.config, &self.queue);
+
+            // self.gaussian_blur.resize(&self.device, &self.config);
         }
     }
 
@@ -241,6 +255,7 @@ impl State<'_> {
         let output_view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
+        // dbg!(output.texture.width(), output.texture.height());
 
         let mut encoder = self
             .device
@@ -251,15 +266,18 @@ impl State<'_> {
         self.scene.render(
             &mut encoder,
             // None,
-            Some(&self.bloom.input_texture_view()),
-            Some(&self.gaussian_blur.input_texture_view()),
+            Some(self.downsampling.input_texture_view()),
+            // Some(&self.bloom.input_texture_view()),
+            Some(&self.kawase_downsampling.input_texture_view()),
             // Some(self.bloom.input_texture_view()),
             // None,
             // Some(&output_view),
-            // Some(self.downsampling.input_texture_view()),
         );
 
-        self.gaussian_blur.render(&mut encoder, Some(&output_view));
+        self.kawase_downsampling.render(&mut encoder, Some(self.kawase_upsampling.input_texture_view()));
+        self.kawase_upsampling.render(&mut encoder, Some(&output_view));
+
+        // self.gaussian_blur.render(&mut encoder, Some(&output_view));
 
         // self.bloom.render(&mut encoder, Some(&output_view));
         // self.downsampling
