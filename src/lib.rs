@@ -34,6 +34,7 @@ mod uniformscontroller;
 mod upsampling;
 mod vertex;
 mod vertices;
+mod gaussian_blur;
 
 mod state;
 use state::State;

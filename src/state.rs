@@ -8,6 +8,7 @@ use winit::{event::*, window::Window};
 
 use crate::bloom::Bloom;
 use crate::downsampling::{self, Downsampling};
+use crate::gaussian_blur::GaussianBlur;
 use crate::time_replacement::{Duration, Instant};
 use crate::upsampling::Upsampling;
 use std::thread::sleep;
@@ -38,6 +39,8 @@ pub struct State<'a> {
     pub bloom: Bloom<{ LEVELS }>,
     pub downsampling: Downsampling<{ LEVELS }>,
     pub upsampling: Upsampling<{ LEVELS }>,
+
+    pub gaussian_blur: GaussianBlur,
 
     // timing
     pub start_of_last_frame_instant: Instant,
@@ -110,6 +113,8 @@ impl State<'_> {
         let upsampling = Upsampling::new(&device, &config, &downsampling.textures);
         // time stuff
 
+        let gaussian_blur = GaussianBlur::new(&device, &config);
+
         let last_frame_time = Instant::now();
 
         let delta_time = Duration::from_secs_f32(0.0);
@@ -131,6 +136,8 @@ impl State<'_> {
             bloom,
             downsampling,
             upsampling,
+            
+            gaussian_blur,
 
             start_of_last_frame_instant: last_frame_time,
             delta_time,
@@ -156,6 +163,8 @@ impl State<'_> {
             self.bloom.resize(&self.device, &self.config);
             // self.downsampling.resize(&self.device, &self.config);
             self.downsampling.resize(&self.device, &self.config);
+
+            self.gaussian_blur.resize(&self.device, &self.config);
         }
     }
 
@@ -243,12 +252,14 @@ impl State<'_> {
             &mut encoder,
             // None,
             Some(&self.bloom.input_texture_view()),
-            Some(&output_view),
+            Some(&self.gaussian_blur.input_texture_view()),
             // Some(self.bloom.input_texture_view()),
             // None,
             // Some(&output_view),
             // Some(self.downsampling.input_texture_view()),
         );
+
+        self.gaussian_blur.render(&mut encoder, Some(&output_view));
 
         // self.bloom.render(&mut encoder, Some(&output_view));
         // self.downsampling
