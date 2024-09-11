@@ -27,13 +27,23 @@ fn main(in: VertexOutput) -> @location(0) vec4<f32> {
     let pixel_size = vec2f(1.0 / f32(resolution.x), 1.0 / f32(resolution.y));
 
     var col = vec4f(0.0);
+    var total_multiplier = 0.0;
     for (var x = -kernel_size; x <= kernel_size; x += 1.0) {
         for (var y = -kernel_size; y <= kernel_size; y += 1.0) {
-            let offset = vec2f(pixel_size.x * x, pixel_size.y * y);
-            col += textureSample(texture, texture_sampler, in.texcoord + offset);
+            let offset = vec2f(x, y);
+            let d = length(offset);
+            let s = d / (kernel_size + 1.0);
+            var multiplier = 3.0 * (1.0 - s) * (1.0 - s) - 2.0 * (1.0 - s) * (1.0 - s) * (1.0 - s);
+            if s > 1.0 {
+                multiplier = 0.0;
+            }
+            let scaled_offset = vec2f(pixel_size.x * offset.x, pixel_size.y * offset.y);
+            col += textureSample(texture, texture_sampler, in.texcoord + scaled_offset) * multiplier;
+            total_multiplier += multiplier;
         }   
     }
-    col /= ((kernel_size * 2.0) + 1.0) * ((kernel_size * 2.0) + 1.0);
+    col /= total_multiplier;
+    // col /= ((kernel_size * 2.0) + 1.0) * ((kernel_size * 2.0) + 1.0);
     
     return col;
 }
