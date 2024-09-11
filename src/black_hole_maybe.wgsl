@@ -113,7 +113,7 @@ fn sdf_markers(p: vec3f) -> f32 {
     // let sd_sphere_2 = sdf_sphere(p, vec3<f32>(0.0, -5.0, -10.0), 0.5);
     // let sd_sphere_3 = sdf_sphere(p, vec3<f32>(5.0, 0.0, -10.0), 0.5);
     // let sd_sphere_4 = sdf_sphere(p, vec3<f32>(-5.0, 0.0, -10.0), 0.5);
-  return min(sd_sphere_1, min(sd_sphere_2, min(sd_sphere_3, sd_sphere_4)));
+    return min(sd_sphere_1, min(sd_sphere_2, min(sd_sphere_3, sd_sphere_4)));
 }
 
 fn sdf(p: vec3<f32>) -> f32 {
@@ -150,10 +150,10 @@ fn get_delta_photon_rk4(photon: Photon, delta_time: f32, h2: f32) -> Photon {
     return Photon(delta_ro, delta_rd);
 }
   
-    fn rotate_vector(vector: vec3f, unit_axis: vec3f, angle: f32) -> vec3f {
+fn rotate_vector(vector: vec3f, unit_axis: vec3f, angle: f32) -> vec3f {
     let cos_theta = cos(angle);
- let    sin_theta = sin(angle);
-  // Calculate the rotation matrix components
+    let sin_theta = sin(angle);
+    // Calculate the rotation matrix components
     let ux = unit_axis.x;
     let uy = unit_axis.y;
     let uz = unit_axis.z;
@@ -171,10 +171,10 @@ fn get_delta_photon_rk4(photon: Photon, delta_time: f32, h2: f32) -> Photon {
             vector.z * (cos_theta + uz * uz * one_minus_cos);
 
     return vec3<f32>(x, y, z);
-  }
+}
 
 fn tsw(t: texture_2d<f32>, s: sampler, p: vec2f) -> vec4f {
-  return textureSample(t, s, p);
+    return textureSample(t, s, p);
 }
 
 fn linearTextureSampleTest(t: texture_2d<f32>, s: sampler, p: vec2f) -> vec4f {

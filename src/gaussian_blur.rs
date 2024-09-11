@@ -1,9 +1,16 @@
+use glam::{uvec2, UVec2};
+use wgpu::util::DeviceExt;
+
 use crate::downsampling::Downsampling;
+use crate::otheruniforms::BufferContent;
 use crate::upsampling::Upsampling;
 
 pub struct GaussianBlur {
     pub input_texture: wgpu::Texture,
     pub input_texture_view: wgpu::TextureView,
+
+    pub resolution_uniform: UVec2,
+    pub resolution_uniform_buffer: wgpu::Buffer,
 
     pub texture_sampler: wgpu::Sampler,
 
@@ -24,6 +31,14 @@ impl GaussianBlur {
             min_filter: wgpu::FilterMode::Linear,
             mipmap_filter: wgpu::FilterMode::Linear,
             ..Default::default()
+        });
+
+        let resolution_uniform = uvec2(config.width, config.height);
+
+        let resolution_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("camer uniforms"),
+            contents: &resolution_uniform.uniform_buffer_content(),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
         let screen_triangle_shader_module =
@@ -49,6 +64,16 @@ impl GaussianBlur {
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
         });
 
@@ -57,6 +82,7 @@ impl GaussianBlur {
             &bind_group_layout,
             &input_texture_view,
             &texture_sampler,
+            &resolution_uniform_buffer,
         );
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -107,6 +133,9 @@ impl GaussianBlur {
             input_texture,
             input_texture_view,
 
+            resolution_uniform,
+            resolution_uniform_buffer,
+
             texture_sampler,
 
             bind_group_layout,
@@ -147,6 +176,7 @@ impl GaussianBlur {
         layout: &wgpu::BindGroupLayout,
         texture: &wgpu::TextureView,
         texture_sampler: &wgpu::Sampler,
+        resolution_uniform_buffer: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("gaussian blur bind group"),
@@ -160,6 +190,10 @@ impl GaussianBlur {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(texture_sampler),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: resolution_uniform_buffer.as_entire_binding(),
+                }
             ],
         });
         bind_group
@@ -173,6 +207,7 @@ impl GaussianBlur {
             &self.bind_group_layout,
             &self.input_texture_view,
             &self.texture_sampler,
+            &self.resolution_uniform_buffer,
         );
     }
 
