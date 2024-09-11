@@ -39,9 +39,6 @@ pub struct State<'a> {
     pub downsampling: Downsampling<{ LEVELS }>,
     pub upsampling: Upsampling<{ LEVELS }>,
 
-    null_texture: wgpu::Texture,
-    null_texture_view: wgpu::TextureView,
-
     // timing
     pub start_of_last_frame_instant: Instant,
     pub delta_time: Duration,
@@ -117,22 +114,6 @@ impl State<'_> {
 
         let delta_time = Duration::from_secs_f32(0.0);
 
-        let null_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("null texture"),
-            mip_level_count: 1,
-            size: wgpu::Extent3d {
-                width: 1280,
-                height: 720,
-                depth_or_array_layers: 1,
-            },
-            format: wgpu::TextureFormat::Bgra8UnormSrgb,
-            dimension: wgpu::TextureDimension::D2,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            sample_count: 1,
-            view_formats: &[],
-        });
-        let null_texture_view = null_texture.create_view(&wgpu::TextureViewDescriptor::default());
-
         Self {
             surface,
             device,
@@ -150,9 +131,6 @@ impl State<'_> {
             bloom,
             downsampling,
             upsampling,
-
-            null_texture,
-            null_texture_view,
 
             start_of_last_frame_instant: last_frame_time,
             delta_time,
