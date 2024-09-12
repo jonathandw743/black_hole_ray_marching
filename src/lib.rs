@@ -19,7 +19,7 @@ use winit::{
 #[macro_use]
 mod smart_include;
 
-// mod bloom;
+mod bloom;
 mod camera;
 mod downsampling;
 mod indices;

@@ -177,6 +177,8 @@ fn tsw(t: texture_2d<f32>, s: sampler, p: vec2f) -> vec4f {
     return textureSample(t, s, p);
 }
 
+// this function was given to me by the mandate of heaven
+// idk what it does anymore
 fn linearTextureSampleTest(t: texture_2d<f32>, s: sampler, p: vec2f) -> vec4f {
   let dim = vec2f(textureDimensions(t));
   let inv_dim = 1.0 / dim;
@@ -336,7 +338,9 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
     // 1 - y because in texture coords, +y is down
     // let col = tsw(t_diffuse, s_diffuse, vec2<f32>(x, 1.0 - y)).xyz;
     // let col = textureSampleLevel(t_diffuse, s_diffuse, vec2<f32>(floor(x), floor(1.0 - y)), 0.0).xyz;
-    let col = linearTextureSampleTest(t_diffuse, s_diffuse, vec2<f32>(x, 1.0 - y)).xyz;
+    var col = textureSampleLevel(t_diffuse, s_diffuse, vec2<f32>(x, 1.0 - y), 0.0).xyz;
+    col.y = pow(col.y, 1.5);
+    col.z = pow(col.z, 1.5);
     return col;
 }
 

@@ -7,6 +7,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::Fullscreen;
 use winit::{event::*, window::Window};
 
+use crate::bloom::Bloom;
 // use crate::bloom::Bloom;
 use crate::downsampling::{self, Downsampling};
 use crate::gaussian_blur::GaussianBlur;
@@ -38,14 +39,14 @@ pub struct State<'a> {
 
     pub scene: Scene,
     // pub blur: Blur,
-    // pub bloom: Bloom<{ LEVELS }>,
-    pub downsampling: Downsampling<{ LEVELS }>,
+    pub bloom: Bloom,
+    // pub downsampling: Downsampling<{ LEVELS }>,
     // pub upsampling: Upsampling<{ LEVELS }>,
 
     // pub gaussian_blur: GaussianBlur,
 
-    pub kawase_upsampling: KawaseUpsampling,
-    pub kawase_downsampling: KawaseDownsampling,
+    // pub kawase_upsampling: KawaseUpsampling,
+    // pub kawase_downsampling: KawaseDownsampling,
 
     // timing
     pub start_of_last_frame_instant: Instant,
@@ -114,14 +115,16 @@ impl State<'_> {
 
         // let bloom = Bloom::new(&device, &config);
 
-        let downsampling = Downsampling::new(&device, &config);
+        // let downsampling = Downsampling::new(&device, &config);
         // let upsampling = Upsampling::new(&device, &config, &downsampling.textures);
         // time stuff
 
         // let gaussian_blur = GaussianBlur::new(&device, &config);
 
-        let kawase_downsampling = KawaseDownsampling::new(&device, &config);
-        let kawase_upsampling = KawaseUpsampling::new(&device, &config);
+        // let kawase_downsampling = KawaseDownsampling::new(&device, &config);
+        // let kawase_upsampling = KawaseUpsampling::new(&device, &config);
+
+        let bloom = Bloom::new(&device, &config);
 
         let last_frame_time = Instant::now();
 
@@ -142,13 +145,15 @@ impl State<'_> {
 
             // blur,
             // bloom,
-            downsampling,
+            // downsampling,
             // upsampling,
             
             // gaussian_blur,
 
-            kawase_upsampling,
-            kawase_downsampling,
+            // kawase_upsampling,
+            // kawase_downsampling,
+
+            bloom,
 
             start_of_last_frame_instant: last_frame_time,
             delta_time,
@@ -173,10 +178,11 @@ impl State<'_> {
             self.scene.resize(&self.device, &self.queue, &self.config);
             // self.bloom.resize(&self.device, &self.config);
             // self.downsampling.resize(&self.device, &self.config);
-            self.downsampling.resize(&self.device, &self.config);
+            // self.downsampling.resize(&self.device, &self.config);
 
-            self.kawase_downsampling.resize(&self.device, &self.config, &self.queue);
-            self.kawase_upsampling.resize(&self.device, &self.config, &self.queue);
+            // self.kawase_downsampling.resize(&self.device, &self.config, &self.queue);
+            // self.kawase_upsampling.resize(&self.device, &self.config, &self.queue);
+            self.bloom.resize(&self.device, &self.config, &self.queue);
 
             // self.gaussian_blur.resize(&self.device, &self.config);
         }
@@ -266,20 +272,20 @@ impl State<'_> {
         self.scene.render(
             &mut encoder,
             // None,
-            Some(self.downsampling.input_texture_view()),
+            Some(&self.bloom.full_image_input_texture_view()),
             // Some(&self.bloom.input_texture_view()),
-            Some(&self.kawase_downsampling.input_texture_view()),
+            Some(&self.bloom.blackout_input_texture_view()),
             // Some(self.bloom.input_texture_view()),
             // None,
             // Some(&output_view),
         );
 
-        self.kawase_downsampling.render(&mut encoder, Some(self.kawase_upsampling.input_texture_view()));
-        self.kawase_upsampling.render(&mut encoder, Some(&output_view));
+        // self.kawase_downsampling.render(&mut encoder, Some(self.kawase_upsampling.input_texture_view()));
+        // self.kawase_upsampling.render(&mut encoder, Some(&output_view));
 
         // self.gaussian_blur.render(&mut encoder, Some(&output_view));
 
-        // self.bloom.render(&mut encoder, Some(&output_view));
+        self.bloom.render(&mut encoder, Some(&output_view));
         // self.downsampling
         // .render(&mut encoder, Some(self.upsampling.input_texture_view()));
         // self.downsampling.render(&mut encoder, Some(&output_view));
