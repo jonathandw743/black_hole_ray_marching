@@ -8,8 +8,8 @@ Use `cargo run` to start.
 
 WASM support may be added.
 
-![Black hole](images/blackhole.png)
-![Black hole from underneath](images/blackholefromunderneath.png)
+![Black hole](images/new_black_hole.png)
+<!-- ![Black hole from underneath](images/blackholefromunderneath.png) -->
 
 
 I keep getting this error.
