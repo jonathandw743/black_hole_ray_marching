@@ -5,7 +5,7 @@ use wgpu::{core::device::queue, util::DeviceExt, Queue};
 
 use crate::otheruniforms::BufferContent;
 
-const LEVELS: usize = 2;
+const LEVELS: usize = 3;
 
 pub struct KawaseDownsampling {
     pub texture_sampler: wgpu::Sampler,

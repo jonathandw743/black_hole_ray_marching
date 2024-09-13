@@ -1,6 +1,5 @@
 use crate::kawase_blur::{KawaseDownsampling, KawaseUpsampling};
 
-
 pub struct Bloom {
     pub full_image_input_texture: wgpu::Texture,
     pub full_image_input_texture_view: wgpu::TextureView,
@@ -241,8 +240,8 @@ impl Bloom {
     ) {
         self.downsampling
             .render(encoder, Some(self.upsampling.input_texture_view()));
-        self.upsampling
-            .render(encoder, Some(&self.blurred_blackout_texture_view));
+        // self.upsampling.render(encoder, output_view);
+        self.upsampling.render(encoder, Some(&self.blurred_blackout_texture_view));
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("blur render pass"),

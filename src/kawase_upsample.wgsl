@@ -21,9 +21,9 @@ var<uniform> resolution: vec2u;
 fn main( in: VertexOutput ) -> @location(0) vec4f
 {
     // vec2 uv = vec2(fragCoord.xy / (iResolution.xy * 2.0));
-    let uv = in.texcoord / 2.0;
+    let uv = in.texcoord;
     // vec2 halfpixel = 0.5 / (iResolution.xy * 2.0);
-    let halfpixel = 0.5 / (vec2f(resolution) * 2.0);
+    let halfpixel = 0.5 / (vec2f(resolution));
     let offset = 3.0;
 
     var sum = textureSample(input_texture, texture_sampler, uv + vec2(-halfpixel.x * 2.0, 0.0) * offset);
