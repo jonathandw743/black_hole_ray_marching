@@ -9,9 +9,9 @@ use winit::{event::*, window::Window};
 
 use crate::bloom::Bloom;
 // use crate::bloom::Bloom;
-use crate::downsampling::{self, Downsampling};
-use crate::gaussian_blur::GaussianBlur;
-use crate::kawase_blur::{KawaseDownsampling, KawaseUpsampling};
+// use crate::downsampling::{self, Downsampling};
+// use crate::gaussian_blur::GaussianBlur;
+use crate::kawase_downsampling::KawaseDownsampling;
 use crate::time_replacement::{Duration, Instant};
 // use crate::upsampling::Upsampling;
 use std::thread::sleep;
@@ -22,8 +22,6 @@ use wasm_bindgen::prelude::*;
 use crate::settings::{Settings, SettingsController};
 
 use crate::scene::Scene;
-
-const LEVELS: usize = 2;
 
 pub struct State<'a> {
     // wgpu and winit setup
@@ -124,7 +122,7 @@ impl State<'_> {
         // let kawase_downsampling = KawaseDownsampling::new(&device, &config);
         // let kawase_upsampling = KawaseUpsampling::new(&device, &config);
 
-        let bloom = Bloom::new(&device, &config);
+        let bloom = Bloom::new(&device, &config, 3);
 
         let last_frame_time = Instant::now();
 

@@ -21,7 +21,7 @@ mod smart_include;
 
 mod bloom;
 mod camera;
-mod downsampling;
+// mod downsampling;
 mod indices;
 mod otheruniforms;
 mod podbool;
@@ -34,10 +34,15 @@ mod uniformscontroller;
 // mod upsampling;
 mod vertex;
 mod vertices;
-mod gaussian_blur;
-mod kawase_blur;
+// mod gaussian_blur;
+mod kawase_downsampling;
+mod kawase_upsampling;
+// mod kawase_mixing_upsampling;
 
 mod state;
+mod blur;
+mod remix;
+mod copy;
 use state::State;
 
 #[derive(Default)]

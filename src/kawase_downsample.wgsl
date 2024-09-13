@@ -32,5 +32,6 @@ fn main( in: VertexOutput ) -> @location(0) vec4f
     sum += textureSample(input_texture, texture_sampler, uv + vec2f(halfpixel.x, -halfpixel.y) * offset);
     sum += textureSample(input_texture, texture_sampler, uv - vec2f(halfpixel.x, -halfpixel.y) * offset);
 
-    return sum / 8.0;
+    // return sum / 8.0;
+    return textureSample(input_texture, texture_sampler, uv);
 }
