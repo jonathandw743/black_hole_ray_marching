@@ -4,8 +4,7 @@ Using rust and WGPU (wgpu-rs), and wgsl shaders. Supports WASM.
 
 Use `cargo run` to start.
 
-![Black hole](images/new_black_hole.png)
-<!-- ![Black hole from underneath](images/blackholefromunderneath.png) -->
+![Black hole](images/black_hole_better_bloom.png)
 
 ## Controls
 
