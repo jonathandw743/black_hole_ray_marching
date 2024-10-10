@@ -39,10 +39,10 @@ mod kawase_downsampling;
 mod kawase_upsampling;
 // mod kawase_mixing_upsampling;
 
-mod state;
 mod blur;
-mod remix;
 mod copy;
+mod remix;
+mod state;
 use state::State;
 
 #[derive(Default)]
@@ -88,7 +88,11 @@ impl ApplicationHandler for App<'_> {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
-        if !self.app_state.as_ref().map_or(false, |app_state| app_state.window.id() == id) {
+        if !self
+            .app_state
+            .as_ref()
+            .map_or(false, |app_state| app_state.window.id() == id)
+        {
             return;
         }
         if let Some(app_state) = self.app_state.as_mut() {
