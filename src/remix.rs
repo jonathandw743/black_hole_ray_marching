@@ -1,4 +1,3 @@
-
 pub struct Remix {
     pub input_texture_0: wgpu::Texture,
     pub input_texture_0_view: wgpu::TextureView,
@@ -157,7 +156,8 @@ impl Remix {
                 height: config.height,
                 depth_or_array_layers: 1,
             },
-            format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            //format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            format: config.format,
             dimension: wgpu::TextureDimension::D2,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             sample_count: 1,

@@ -14,7 +14,7 @@ var input_texture: texture_2d<f32>;
 var texture_sampler: sampler;
 
 @group(0) @binding(2)
-var<uniform> resolution: vec2u;
+var<uniform> resolution: vec4u;
 
 // https://www.shadertoy.com/view/3td3W8
 @fragment
@@ -23,7 +23,7 @@ fn main( in: VertexOutput ) -> @location(0) vec4f
     // vec2 uv = vec2(fragCoord.xy / (iResolution.xy / 2.0));
     let uv = in.texcoord;
     // vec2 halfpixel = 0.5 / (iResolution.xy / 2.0);
-    let halfpixel = 0.5 / (vec2f(resolution));
+    let halfpixel = 0.5 / (vec2f(resolution.xy));
     let offset = 3.0;
 
     var sum = textureSample(input_texture, texture_sampler, uv) * 4.0;

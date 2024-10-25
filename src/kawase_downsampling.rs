@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use glam::{uvec2, UVec2};
+use glam::{uvec2, uvec4, UVec2, UVec4};
 use wgpu::{core::device::queue, util::DeviceExt, Queue};
 
 use crate::otheruniforms::BufferContent;
@@ -9,14 +9,14 @@ pub struct KawaseDownsampling {
     pub texture_sampler: wgpu::Sampler,
 
     pub textures: Vec<(wgpu::Texture, wgpu::TextureView)>,
-    pub resolutions: Vec<UVec2>,
+    pub resolutions: Vec<UVec4>,
     pub resolution_uniform_buffers: Vec<wgpu::Buffer>,
 
     pub bind_group_layout: wgpu::BindGroupLayout,
     pub bind_groups: Vec<wgpu::BindGroup>,
     pub render_pipeline: wgpu::RenderPipeline,
 
-    levels: usize
+    levels: usize,
 }
 
 impl KawaseDownsampling {
@@ -32,23 +32,25 @@ impl KawaseDownsampling {
         });
 
         let mut resolutions = Vec::new();
-        let mut dim = uvec2(config.width, config.height);
+        let mut dim = uvec4(config.width, config.height, 0, 0);
         for _ in 0..levels {
             dim.x = dim.x.max(1);
             dim.y = dim.y.max(1);
             resolutions.push(dim);
-            dim = uvec2(dim.x / 2, dim.y / 2);
+            dim = uvec4(dim.x / 2, dim.y / 2, 0, 0);
         }
         dbg!(&resolutions);
         let mut resolution_uniform_buffers = Vec::new();
         for resolution in &resolutions {
-            resolution_uniform_buffers.push(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("kawase downsampling resolution uniform buffer"),
-                contents: &resolution.uniform_buffer_content(),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            }));
+            resolution_uniform_buffers.push(device.create_buffer_init(
+                &wgpu::util::BufferInitDescriptor {
+                    label: Some("kawase downsampling resolution uniform buffer"),
+                    contents: &resolution.uniform_buffer_content(),
+                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                },
+            ));
         }
-        let textures = Self::create_textures(device, &resolutions, levels);
+        let textures = Self::create_textures(device, config, &resolutions, levels);
 
         let screen_triangle_shader_module =
             device.create_shader_module(wgpu::include_wgsl!("screen_triangle.wgsl"));
@@ -94,19 +96,19 @@ impl KawaseDownsampling {
             &textures,
             &texture_sampler,
             &resolution_uniform_buffers,
-            levels
+            levels,
         );
 
         let downsampling_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("downsampling pipeline layout"),
+                label: Some("kawase downsampling pipeline layout"),
                 bind_group_layouts: &[&downsampling_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
         let downsampling_render_pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("scene Pipeline"),
+                label: Some("kawase downsampling Pipeline"),
                 layout: Some(&downsampling_pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &screen_triangle_shader_module,
@@ -164,8 +166,9 @@ impl KawaseDownsampling {
 
     fn create_textures(
         device: &wgpu::Device,
-        resolutions: &Vec<UVec2>,
-        levels: usize
+        config: &wgpu::SurfaceConfiguration,
+        resolutions: &Vec<UVec4>,
+        levels: usize,
     ) -> Vec<(wgpu::Texture, wgpu::TextureView)> {
         // downsample happens first so the first (input) texture is the original size
         let mut result = Vec::new();
@@ -178,7 +181,7 @@ impl KawaseDownsampling {
                     height: resolutions[level].y,
                     depth_or_array_layers: 1,
                 },
-                format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                format: config.format,
                 dimension: wgpu::TextureDimension::D2,
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT
                     | wgpu::TextureUsages::TEXTURE_BINDING,
@@ -197,7 +200,7 @@ impl KawaseDownsampling {
         textures: &Vec<(wgpu::Texture, wgpu::TextureView)>,
         texture_sampler: &wgpu::Sampler,
         resolution_uniform_buffers: &Vec<wgpu::Buffer>,
-        levels: usize
+        levels: usize,
     ) -> Vec<wgpu::BindGroup> {
         let mut result = Vec::new();
         for level in 0..levels {
@@ -216,7 +219,7 @@ impl KawaseDownsampling {
                     wgpu::BindGroupEntry {
                         binding: 2,
                         resource: resolution_uniform_buffers[level].as_entire_binding(),
-                    }
+                    },
                 ],
             });
             result.push(bind_group);
@@ -224,26 +227,35 @@ impl KawaseDownsampling {
         result
     }
 
-    pub fn resize(&mut self, device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, queue: &wgpu::Queue) {
+    pub fn resize(
+        &mut self,
+        device: &wgpu::Device,
+        config: &wgpu::SurfaceConfiguration,
+        queue: &wgpu::Queue,
+    ) {
         self.resolutions = Vec::new();
-        let mut dim = uvec2(config.width, config.height);
+        let mut dim = uvec4(config.width, config.height, 0, 0);
         for _ in 0..self.levels {
             dim.x = dim.x.max(1);
             dim.y = dim.y.max(1);
             self.resolutions.push(dim);
-            dim = uvec2(dim.x / 2, dim.y / 2);
+            dim = uvec4(dim.x / 2, dim.y / 2, 0, 0);
         }
         for level in 0..self.levels {
-            queue.write_buffer(&self.resolution_uniform_buffers[level], 0, &self.resolutions[level].uniform_buffer_content());
+            queue.write_buffer(
+                &self.resolution_uniform_buffers[level],
+                0,
+                &self.resolutions[level].uniform_buffer_content(),
+            );
         }
-        self.textures = Self::create_textures(device, &self.resolutions, self.levels);
+        self.textures = Self::create_textures(device, config, &self.resolutions, self.levels);
         self.bind_groups = Self::create_bind_groups(
             device,
             &self.bind_group_layout,
             &self.textures,
             &self.texture_sampler,
             &self.resolution_uniform_buffers,
-            self.levels
+            self.levels,
         );
     }
 

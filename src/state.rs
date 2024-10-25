@@ -1,6 +1,6 @@
+use glam::uvec2;
 use std::iter;
 use std::sync::Arc;
-use glam::uvec2;
 use wgpu::{Device, Instance, InstanceFlags, Queue, Surface, SurfaceConfiguration};
 use winit::dpi::PhysicalPosition;
 use winit::keyboard::{KeyCode, PhysicalKey};
@@ -99,6 +99,7 @@ impl State<'_> {
         let config = surface
             .get_default_config(&adapter, size.width, size.height)
             .unwrap();
+        //config.format = wgpu::TextureFormat::Bgra8UnormSrgb;
         surface.configure(&device, &config);
 
         let settings = Settings::new();
@@ -107,7 +108,7 @@ impl State<'_> {
 
         surface.configure(&device, &config);
 
-        let scene = Scene::new(&device, &queue, &config, true);
+        let scene = Scene::new(&device, &queue, &config, false);
 
         // let blur = Blur::new(&device, &queue, &config, &scene.output_texture_view);
 
@@ -145,12 +146,11 @@ impl State<'_> {
             // bloom,
             // downsampling,
             // upsampling,
-            
+
             // gaussian_blur,
 
             // kawase_upsampling,
             // kawase_downsampling,
-
             bloom,
 
             start_of_last_frame_instant: last_frame_time,
@@ -269,13 +269,10 @@ impl State<'_> {
 
         self.scene.render(
             &mut encoder,
-            // None,
-            Some(&self.bloom.full_image_input_texture_view()),
-            // Some(&self.bloom.input_texture_view()),
-            Some(&self.bloom.blackout_input_texture_view()),
-            // Some(self.bloom.input_texture_view()),
-            // None,
-            // Some(&output_view),
+            //Some(&self.bloom.full_image_input_texture_view()),
+            Some(&output_view),
+            //Some(&self.bloom.blackout_input_texture_view()),
+            None,
         );
 
         // self.kawase_downsampling.render(&mut encoder, Some(self.kawase_upsampling.input_texture_view()));
@@ -283,7 +280,8 @@ impl State<'_> {
 
         // self.gaussian_blur.render(&mut encoder, Some(&output_view));
 
-        self.bloom.render(&mut encoder, Some(&output_view));
+        //self.bloom.render(&mut encoder, Some(&output_view));
+
         // self.downsampling
         // .render(&mut encoder, Some(self.upsampling.input_texture_view()));
         // self.downsampling.render(&mut encoder, Some(&output_view));

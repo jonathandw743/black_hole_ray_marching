@@ -66,7 +66,7 @@ impl<const LEVELS: usize> Downsampling<LEVELS> {
 
         let downsampling_render_pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("scene Pipeline"),
+                label: Some("downsampling pipeline"),
                 layout: Some(&downsampling_pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &screen_triangle_shader_module,
@@ -100,7 +100,7 @@ impl<const LEVELS: usize> Downsampling<LEVELS> {
                     alpha_to_coverage_enabled: false,
                 },
                 multiview: None,
-                cache: None
+                cache: None,
             });
 
         Self {

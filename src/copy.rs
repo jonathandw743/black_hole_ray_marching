@@ -1,4 +1,3 @@
-
 pub struct Copy {
     pub input_texture: wgpu::Texture,
     pub input_texture_view: wgpu::TextureView,
@@ -129,7 +128,8 @@ impl Copy {
                 height: config.height,
                 depth_or_array_layers: 1,
             },
-            format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            //format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            format: config.format,
             dimension: wgpu::TextureDimension::D2,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             sample_count: 1,
@@ -164,8 +164,7 @@ impl Copy {
     }
 
     pub fn resize(&mut self, device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) {
-        (self.input_texture, self.input_texture_view) =
-            Self::create_input_texture(device, config);
+        (self.input_texture, self.input_texture_view) = Self::create_input_texture(device, config);
         self.bind_group = Self::create_bind_group(
             device,
             &self.bind_group_layout,

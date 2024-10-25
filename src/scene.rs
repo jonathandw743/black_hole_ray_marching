@@ -239,13 +239,13 @@ impl Scene {
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("scene Pipeline Layout"),
+                label: Some("scene pipeline Layout"),
                 bind_group_layouts: &[&bind_group_layout, &space_texture_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("scene Pipeline"),
+            label: Some("scene pipeline"),
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &black_hole_shader,
