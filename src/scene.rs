@@ -137,7 +137,7 @@ impl Scene {
         );
 
         let other_uniforms_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("camer uniforms"),
+            label: Some("other uniforms"),
             contents: &other_uniforms.uniform_buffer_content(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });

@@ -42,100 +42,56 @@ mod kawase_upsampling;
 mod copy;
 mod remix;
 mod state;
-use state::State;
 
 #[cfg(not(target_arch = "wasm32"))]
-#[derive(Default)]
-struct App<'a> {
-    // we wrap this because the window and surface should be created after the first resume
-    // (as in the docs for ApplicationHander::resumed)
-    // so we start off with this as none
-    // and we can't impl ApplicationHandler for Option<AppState> because of the orphan rules
-    app_state: Option<State<'a>>,
-}
+mod app;
 
 #[cfg(not(target_arch = "wasm32"))]
-impl ApplicationHandler for App<'_> {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let window_attrs = Window::default_attributes().with_inner_size(PhysicalSize {
-            width: 1280,
-            height: 720,
-        });
-        let window = event_loop
-            .create_window(window_attrs)
-            .expect("Couldn't create window.");
-
-        self.app_state = Some(pollster::block_on(State::new(window)));
-    }
-
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
-        if !self
-            .app_state
-            .as_ref()
-            .map_or(false, |app_state| app_state.window.id() == id)
-        {
-            return;
-        }
-        if let Some(app_state) = self.app_state.as_mut() {
-            let _ = app_state.process_event(&event);
-        }
-        match event {
-            WindowEvent::CloseRequested => {
-                println!("The close button was pressed; stopping");
-                event_loop.exit();
-            }
-            _ => {}
-        };
-    }
+pub fn run() {
+    let event_loop = EventLoop::new().unwrap();
+    event_loop.set_control_flow(ControlFlow::Wait);
+    let mut app = app::App::default();
+    #[cfg(not(target_arch = "wasm32"))]
+    env_logger::init();
+    let _ = event_loop.run_app(&mut app);
 }
 
+#[cfg(target_arch = "wasm32")]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
 pub fn run() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        let event_loop = EventLoop::new().unwrap();
-        event_loop.set_control_flow(ControlFlow::Wait);
-        let mut app = App::default();
-        #[cfg(not(target_arch = "wasm32"))]
-        env_logger::init();
-        let _ = event_loop.run_app(&mut app);
-    }
-    #[cfg(target_arch = "wasm32")]
-    {
-        wasm_bindgen_futures::spawn_local(async {
-            std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-            console_log::init().expect("could not initialize logger");
-            let event_loop = EventLoop::new().unwrap();
-            let window = event_loop
-                .create_window(Window::default_attributes())
-                .unwrap();
-            use winit::platform::web::WindowExtWebSys;
-            web_sys::window()
-                .and_then(|win| win.document())
-                .and_then(|doc| {
-                    let dst = doc.get_element_by_id("wasm-example")?;
-                    let canvas = web_sys::Element::from(window.canvas().unwrap());
-                    dst.append_child(&canvas).ok()?;
-                    Some(())
-                })
-                .expect("Couldn't append canvas to document body.");
-            let mut app_state = State::new(window).await;
-            event_loop.run(move |event, active_event_loop| match event {
-                Event::WindowEvent {
-                    ref event,
-                    window_id,
-                } if window_id == app_state.window.id() => {
-                    app_state.process_event(event);
-                    match event {
-                        WindowEvent::CloseRequested => {
-                            println!("The close button was pressed; stopping");
-                            active_event_loop.exit();
-                        }
-                        _ => {}
-                    };
-                }
-                _ => {}
-            });
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    console_log::init().expect("could not initialize logger");
+    let event_loop = EventLoop::new().unwrap();
+    let window = event_loop
+        .create_window(Window::default_attributes())
+        .unwrap();
+    use winit::platform::web::WindowExtWebSys;
+    web_sys::window()
+        .and_then(|win| win.document())
+        .and_then(|doc| {
+            let dst = doc.get_element_by_id("wasm-example")?;
+            let canvas = web_sys::Element::from(window.canvas().unwrap());
+            dst.append_child(&canvas).ok()?;
+            Some(())
+        })
+        .expect("Couldn't append canvas to document body.");
+    wasm_bindgen_futures::spawn_local(async {
+        let mut app_state = State::new(window).await;
+        event_loop.run(move |event, active_event_loop| match event {
+            Event::WindowEvent {
+                ref event,
+                window_id,
+            } if window_id == app_state.window.id() => {
+                app_state.process_event(event);
+                match event {
+                    WindowEvent::CloseRequested => {
+                        println!("The close button was pressed; stopping");
+                        active_event_loop.exit();
+                    }
+                    _ => {}
+                };
+            }
+            _ => {}
         });
-    }
+    });
 }

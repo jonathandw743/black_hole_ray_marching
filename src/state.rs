@@ -88,15 +88,15 @@ impl State<'_> {
         let mut limits =
             wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits());
         limits.max_storage_textures_per_shader_stage = 2;
-        limits.max_texture_dimension_1d = 10000;
-        limits.max_texture_dimension_2d = 10000;
-        limits.max_texture_dimension_3d = 1;
+        // limits.max_texture_dimension_1d = 10000;
+        // limits.max_texture_dimension_2d = 10000;
+        // limits.max_texture_dimension_3d = 1;
         limits.max_compute_workgroup_size_x = 1;
         limits.max_compute_workgroup_size_y = 1;
         limits.max_compute_workgroup_size_z = 1;
-        limits.max_compute_invocations_per_workgroup = 10;
-        limits.max_compute_workgroup_storage_size = 10000;
-        limits.max_compute_workgroups_per_dimension = 10000;
+        limits.max_compute_invocations_per_workgroup = 1;
+        // limits.max_compute_workgroup_storage_size = 10000;
+        limits.max_compute_workgroups_per_dimension = 1280;
 
         // Create the logical device and command queue
         let (device, queue) = adapter
