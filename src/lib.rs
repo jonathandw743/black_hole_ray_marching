@@ -9,8 +9,8 @@ use winit::{
     application::ApplicationHandler,
     dpi::PhysicalSize,
     error::EventLoopError,
-    event::{ElementState, KeyEvent, WindowEvent},
-    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
+    event::{ElementState, Event, KeyEvent, WindowEvent},
+    event_loop::{self, ActiveEventLoop, ControlFlow, EventLoop},
     keyboard::{KeyCode, PhysicalKey},
     window::{Fullscreen, Window, WindowId},
 };
@@ -44,15 +44,17 @@ mod remix;
 mod state;
 use state::State;
 
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Default)]
 struct App<'a> {
-    // we wrp this because the window and surface should be created after the first resume
+    // we wrap this because the window and surface should be created after the first resume
     // (as in the docs for ApplicationHander::resumed)
     // so we start off with this as none
     // and we can't impl ApplicationHandler for Option<AppState> because of the orphan rules
     app_state: Option<State<'a>>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl ApplicationHandler for App<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window_attrs = Window::default_attributes().with_inner_size(PhysicalSize {
@@ -63,54 +65,18 @@ impl ApplicationHandler for App<'_> {
             .create_window(window_attrs)
             .expect("Couldn't create window.");
 
-        #[cfg(target_arch = "wasm32")]
-        {
-            use web_sys::Element;
-            use winit::{dpi::PhysicalSize, platform::web::WindowExtWebSys};
-
-            web_sys::window()
-                .and_then(|win| win.document())
-                .and_then(|doc| {
-                    let dst = doc.get_element_by_id("wasm-example")?;
-                    let canvas = Element::from(window.canvas()?);
-                    dst.append_child(&canvas).ok()?;
-                    Some(())
-                })
-                .expect("Couldn't append canvas to document body.");
-
-            // Winit prevents sizing with CSS, so we have to set
-            // the size manually when on web.
-            let _ = window.request_inner_size(PhysicalSize::new(1280, 720));
-        }
-
-        // #[cfg(not(target_arch = "wasm32"))]
-        // {
-        //     self.app_state = Rc::new(RefCell::new(Some(pollster::block_on(State::new(window)))));
-        // }
-        // #[cfg(target_arch = "wasm32")]
-        // {
-        // let a = Rc::clone(&self.app_state);
-        let a = self.app_state.clone();
-        wasm_bindgen_futures::spawn_local(async move {
-            let state = State::new(window).await;
-            a = Some(state);
-            // self.app_state.borrow_mut();
-            ()
-            // *self.app_state.borrow_mut() = Some(state);
-        });
-        // }
+        self.app_state = Some(pollster::block_on(State::new(window)));
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
         if !self
             .app_state
-            .borrow()
             .as_ref()
             .map_or(false, |app_state| app_state.window.id() == id)
         {
             return;
         }
-        if let Some(app_state) = self.app_state.borrow_mut().as_mut() {
+        if let Some(app_state) = self.app_state.as_mut() {
             let _ = app_state.process_event(&event);
         }
         match event {
@@ -124,7 +90,7 @@ impl ApplicationHandler for App<'_> {
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
-pub async fn run() {
+pub fn run() {
     #[cfg(not(target_arch = "wasm32"))]
     {
         let event_loop = EventLoop::new().unwrap();
@@ -136,7 +102,40 @@ pub async fn run() {
     }
     #[cfg(target_arch = "wasm32")]
     {
-        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-        console_log::init().expect("could not initialize logger");
+        wasm_bindgen_futures::spawn_local(async {
+            std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+            console_log::init().expect("could not initialize logger");
+            let event_loop = EventLoop::new().unwrap();
+            let window = event_loop
+                .create_window(Window::default_attributes())
+                .unwrap();
+            use winit::platform::web::WindowExtWebSys;
+            web_sys::window()
+                .and_then(|win| win.document())
+                .and_then(|doc| {
+                    let dst = doc.get_element_by_id("wasm-example")?;
+                    let canvas = web_sys::Element::from(window.canvas().unwrap());
+                    dst.append_child(&canvas).ok()?;
+                    Some(())
+                })
+                .expect("Couldn't append canvas to document body.");
+            let mut app_state = State::new(window).await;
+            event_loop.run(move |event, active_event_loop| match event {
+                Event::WindowEvent {
+                    ref event,
+                    window_id,
+                } if window_id == app_state.window.id() => {
+                    app_state.process_event(event);
+                    match event {
+                        WindowEvent::CloseRequested => {
+                            println!("The close button was pressed; stopping");
+                            active_event_loop.exit();
+                        }
+                        _ => {}
+                    };
+                }
+                _ => {}
+            });
+        });
     }
 }

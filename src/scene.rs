@@ -182,12 +182,14 @@ impl Scene {
             ],
             label: Some("scene bind_group"),
         });
-
+        
         cfg_if! {
             if #[cfg(target_arch = "wasm32")] {
                 let space_bytes = include_bytes!("space_2048x1024.jpg");
+                let space_bytes = include_bytes!("space_4096x2048.jpg");
             } else {
                 let space_bytes = include_bytes!("space_4096x2048.jpg");
+                // let space_bytes = include_bytes!("space_2048x1024.jpg");
                 // let space_bytes = include_bytes!("dark_space.jpg");
             }
         }
