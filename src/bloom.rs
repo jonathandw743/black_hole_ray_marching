@@ -62,10 +62,20 @@ impl Bloom {
             self.remixes[0].render(encoder, Some(self.copies[level + 1].input_texture_view()));
         }
 
-        self.copies[self.levels - 1].render(encoder, Some(self.blurs[self.levels - 1].input_texture_view()));
-        self.copies[self.levels - 1].render(encoder, Some(self.remixes[self.levels - 1].input_texture_0_view()));
-        self.blurs[self.levels - 1].render(encoder, Some(self.remixes[self.levels - 1].input_texture_1_view()));
-        self.remixes[self.levels - 1].render(encoder, Some(self.final_remix.input_texture_1_view()));
+        self.copies[self.levels - 1].render(
+            encoder,
+            Some(self.blurs[self.levels - 1].input_texture_view()),
+        );
+        self.copies[self.levels - 1].render(
+            encoder,
+            Some(self.remixes[self.levels - 1].input_texture_0_view()),
+        );
+        self.blurs[self.levels - 1].render(
+            encoder,
+            Some(self.remixes[self.levels - 1].input_texture_1_view()),
+        );
+        self.remixes[self.levels - 1]
+            .render(encoder, Some(self.final_remix.input_texture_1_view()));
 
         self.final_remix.render(encoder, output_view);
     }

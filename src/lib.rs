@@ -1,5 +1,4 @@
-use pollster::block_on;
-use std::{borrow::Cow, sync::Arc};
+use std::{borrow::Cow, cell::RefCell, rc::Rc, sync::Arc};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 use wgpu::{
@@ -19,7 +18,7 @@ use winit::{
 #[macro_use]
 mod smart_include;
 
-mod bloom;
+//mod bloom;
 mod camera;
 // mod downsampling;
 mod indices;
@@ -39,7 +38,7 @@ mod kawase_downsampling;
 mod kawase_upsampling;
 // mod kawase_mixing_upsampling;
 
-mod blur;
+//mod blur;
 mod copy;
 mod remix;
 mod state;
@@ -47,7 +46,7 @@ use state::State;
 
 #[derive(Default)]
 struct App<'a> {
-    // we wrap this because the window and surface should be created after the first resume
+    // we wrp this because the window and surface should be created after the first resume
     // (as in the docs for ApplicationHander::resumed)
     // so we start off with this as none
     // and we can't impl ApplicationHandler for Option<AppState> because of the orphan rules
@@ -84,18 +83,34 @@ impl ApplicationHandler for App<'_> {
             let _ = window.request_inner_size(PhysicalSize::new(1280, 720));
         }
 
-        self.app_state = Some(block_on(State::new(window)));
+        // #[cfg(not(target_arch = "wasm32"))]
+        // {
+        //     self.app_state = Rc::new(RefCell::new(Some(pollster::block_on(State::new(window)))));
+        // }
+        // #[cfg(target_arch = "wasm32")]
+        // {
+        // let a = Rc::clone(&self.app_state);
+        let a = self.app_state.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            let state = State::new(window).await;
+            a = Some(state);
+            // self.app_state.borrow_mut();
+            ()
+            // *self.app_state.borrow_mut() = Some(state);
+        });
+        // }
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
         if !self
             .app_state
+            .borrow()
             .as_ref()
             .map_or(false, |app_state| app_state.window.id() == id)
         {
             return;
         }
-        if let Some(app_state) = self.app_state.as_mut() {
+        if let Some(app_state) = self.app_state.borrow_mut().as_mut() {
             let _ = app_state.process_event(&event);
         }
         match event {
@@ -109,18 +124,19 @@ impl ApplicationHandler for App<'_> {
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
-pub fn run() {
-    let event_loop = EventLoop::new().unwrap();
-    event_loop.set_control_flow(ControlFlow::Wait);
-    let mut app = App::default();
+pub async fn run() {
     #[cfg(not(target_arch = "wasm32"))]
     {
+        let event_loop = EventLoop::new().unwrap();
+        event_loop.set_control_flow(ControlFlow::Wait);
+        let mut app = App::default();
+        #[cfg(not(target_arch = "wasm32"))]
         env_logger::init();
+        let _ = event_loop.run_app(&mut app);
     }
     #[cfg(target_arch = "wasm32")]
     {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
         console_log::init().expect("could not initialize logger");
     }
-    let _ = event_loop.run_app(&mut app);
 }

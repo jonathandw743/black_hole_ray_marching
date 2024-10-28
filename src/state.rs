@@ -1,13 +1,17 @@
 use glam::uvec2;
 use std::iter;
 use std::sync::Arc;
-use wgpu::{Device, Instance, InstanceFlags, Queue, Surface, SurfaceConfiguration};
+use wgpu::{
+    Device, Instance, InstanceFlags, Queue, Surface, SurfaceConfiguration, Texture,
+    TextureViewDescriptor,
+};
 use winit::dpi::PhysicalPosition;
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::Fullscreen;
 use winit::{event::*, window::Window};
 
-use crate::bloom::Bloom;
+use crate::copy::Copy;
+//use crate::bloom::Bloom;
 // use crate::bloom::Bloom;
 // use crate::downsampling::{self, Downsampling};
 // use crate::gaussian_blur::GaussianBlur;
@@ -36,8 +40,12 @@ pub struct State<'a> {
     pub settings_controller: SettingsController,
 
     pub scene: Scene,
+
+    pub source: Texture,
+    pub destination: Texture,
+    pub copy: Copy,
     // pub blur: Blur,
-    pub bloom: Bloom,
+    //pub bloom: Bloom,
     // pub downsampling: Downsampling<{ LEVELS }>,
     // pub upsampling: Upsampling<{ LEVELS }>,
 
@@ -77,6 +85,19 @@ impl State<'_> {
             .await
             .expect("Failed to find an appropriate adapter");
 
+        let mut limits =
+            wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits());
+        limits.max_storage_textures_per_shader_stage = 2;
+        limits.max_texture_dimension_1d = 10000;
+        limits.max_texture_dimension_2d = 10000;
+        limits.max_texture_dimension_3d = 1;
+        limits.max_compute_workgroup_size_x = 1;
+        limits.max_compute_workgroup_size_y = 1;
+        limits.max_compute_workgroup_size_z = 1;
+        limits.max_compute_invocations_per_workgroup = 10;
+        limits.max_compute_workgroup_storage_size = 10000;
+        limits.max_compute_workgroups_per_dimension = 10000;
+
         // Create the logical device and command queue
         let (device, queue) = adapter
             .request_device(
@@ -84,8 +105,7 @@ impl State<'_> {
                     label: None,
                     required_features: wgpu::Features::empty(),
                     // Make sure we use the texture resolution limits from the adapter, so we can support images the size of the swapchain.
-                    required_limits: wgpu::Limits::downlevel_webgl2_defaults()
-                        .using_resolution(adapter.limits()),
+                    required_limits: limits,
                     memory_hints: wgpu::MemoryHints::MemoryUsage,
                 },
                 None,
@@ -109,7 +129,40 @@ impl State<'_> {
         surface.configure(&device, &config);
 
         let scene = Scene::new(&device, &queue, &config, false);
-
+        let source = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("source"),
+            mip_level_count: 1,
+            size: wgpu::Extent3d {
+                width: 1280,
+                height: 270,
+                depth_or_array_layers: 1,
+            },
+            format: wgpu::TextureFormat::Rgba8Unorm, //config.format,
+            dimension: wgpu::TextureDimension::D2,
+            usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+            sample_count: 1,
+            view_formats: &[],
+        });
+        let destination = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("destination"),
+            mip_level_count: 1,
+            size: wgpu::Extent3d {
+                width: 1280,
+                height: 270,
+                depth_or_array_layers: 1,
+            },
+            format: wgpu::TextureFormat::Rgba8Unorm, //config.format,
+            dimension: wgpu::TextureDimension::D2,
+            usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+            sample_count: 1,
+            view_formats: &[],
+        });
+        let copy = Copy::new(
+            &device,
+            &config,
+            &source.create_view(&wgpu::TextureViewDescriptor::default()),
+            &destination.create_view(&wgpu::TextureViewDescriptor::default()),
+        );
         // let blur = Blur::new(&device, &queue, &config, &scene.output_texture_view);
 
         // let bloom = Bloom::new(&device, &config);
@@ -123,7 +176,7 @@ impl State<'_> {
         // let kawase_downsampling = KawaseDownsampling::new(&device, &config);
         // let kawase_upsampling = KawaseUpsampling::new(&device, &config);
 
-        let bloom = Bloom::new(&device, &config, 3);
+        //let bloom = Bloom::new(&device, &config, 3);
 
         let last_frame_time = Instant::now();
 
@@ -142,6 +195,10 @@ impl State<'_> {
 
             scene,
 
+            source,
+            destination,
+            copy,
+
             // blur,
             // bloom,
             // downsampling,
@@ -151,8 +208,7 @@ impl State<'_> {
 
             // kawase_upsampling,
             // kawase_downsampling,
-            bloom,
-
+            //bloom,
             start_of_last_frame_instant: last_frame_time,
             delta_time,
 
@@ -180,7 +236,7 @@ impl State<'_> {
 
             // self.kawase_downsampling.resize(&self.device, &self.config, &self.queue);
             // self.kawase_upsampling.resize(&self.device, &self.config, &self.queue);
-            self.bloom.resize(&self.device, &self.config, &self.queue);
+            //self.bloom.resize(&self.device, &self.config, &self.queue);
 
             // self.gaussian_blur.resize(&self.device, &self.config);
         }
@@ -274,6 +330,8 @@ impl State<'_> {
             //Some(&self.bloom.blackout_input_texture_view()),
             None,
         );
+
+        self.copy.pass(&mut encoder, 1280, 720);
 
         // self.kawase_downsampling.render(&mut encoder, Some(self.kawase_upsampling.input_texture_view()));
         // self.kawase_upsampling.render(&mut encoder, Some(&output_view));

@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use glam::{uvec2, uvec4, UVec2, UVec4};
-use wgpu::{core::device::queue, util::DeviceExt, Queue};
+use wgpu::{util::DeviceExt, Queue};
 
 use crate::otheruniforms::BufferContent;
 
