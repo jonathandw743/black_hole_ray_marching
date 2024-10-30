@@ -62,7 +62,7 @@ impl Camera {
         vec2(tan_fovy_half * self.aspect, tan_fovy_half)
     }
 
-    pub fn clip_position_with_tansform_to_direction(
+    pub fn clip_position_with_transform_to_direction(
         tan_fov_half: Vec2,
         rot_matrix: Mat4,
         clip_position: Vec2,
@@ -83,7 +83,7 @@ impl Camera {
     pub fn clip_position_to_world_direction(&self, clip_position: Vec2) -> Vec3 {
         let tan_fov_half = self.tan_fov_half();
         let rot_matrix = self.rot_matrix();
-        Self::clip_position_with_tansform_to_direction(tan_fov_half, rot_matrix, clip_position)
+        Self::clip_position_with_transform_to_direction(tan_fov_half, rot_matrix, clip_position)
     }
 
     pub fn pos_to_world_space_screen_triangle(
@@ -93,17 +93,17 @@ impl Camera {
         let tan_fov_half = self.tan_fov_half();
         let rot_matrix = self.rot_matrix();
         [
-            Self::clip_position_with_tansform_to_direction(
+            Self::clip_position_with_transform_to_direction(
                 tan_fov_half,
                 rot_matrix,
                 screen_space_screen_triangle[0],
             ),
-            Self::clip_position_with_tansform_to_direction(
+            Self::clip_position_with_transform_to_direction(
                 tan_fov_half,
                 rot_matrix,
                 screen_space_screen_triangle[1],
             ),
-            Self::clip_position_with_tansform_to_direction(
+            Self::clip_position_with_transform_to_direction(
                 tan_fov_half,
                 rot_matrix,
                 screen_space_screen_triangle[2],

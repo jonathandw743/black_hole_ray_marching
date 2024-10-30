@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use glam::uvec2;
 use std::iter;
 use std::sync::Arc;
@@ -29,7 +30,6 @@ use crate::scene::Scene;
 
 pub struct State<'a> {
     // wgpu and winit setup
-    pub window: Arc<Window>,
     pub surface: Surface<'a>,
     pub device: Device,
     pub queue: Queue,
@@ -65,16 +65,14 @@ pub struct State<'a> {
 }
 
 impl State<'_> {
-    pub async fn new(window: Window) -> Self {
-        let window = Arc::new(window);
-
+    pub async fn new(window: Arc<Window>) -> Result<Self> {
         let mut size = window.inner_size();
         size.width = size.width.max(1);
         size.height = size.height.max(1);
 
         let instance = Instance::default();
 
-        let surface = instance.create_surface(Arc::clone(&window)).unwrap();
+        let surface = instance.create_surface(Arc::clone(&window))?;
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
@@ -83,7 +81,7 @@ impl State<'_> {
                 compatible_surface: Some(&surface),
             })
             .await
-            .expect("Failed to find an appropriate adapter");
+            .ok_or(anyhow!("Failed to find an appropriate adapter"))?;
 
         let mut limits =
             wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits());
@@ -110,15 +108,14 @@ impl State<'_> {
                 },
                 None,
             )
-            .await
-            .expect("Failed to create device");
+            .await.map_err(|_| anyhow!("Failed to request device"))?;
 
         let swapchain_capabilities = surface.get_capabilities(&adapter);
         let swapchain_format = swapchain_capabilities.formats[0];
 
         let config = surface
             .get_default_config(&adapter, size.width, size.height)
-            .unwrap();
+            .ok_or(anyhow!("Failed to get surface configuration"))?;
         //config.format = wgpu::TextureFormat::Bgra8UnormSrgb;
         surface.configure(&device, &config);
 
@@ -182,14 +179,12 @@ impl State<'_> {
 
         let delta_time = Duration::from_secs_f32(0.0);
 
-        Self {
+        Ok(Self {
             surface,
             device,
             queue,
             config,
             // size,
-            window,
-
             settings,
             settings_controller,
 
@@ -216,14 +211,10 @@ impl State<'_> {
             cursor_position: None,
 
             frame_number: 0,
-        }
+        })
     }
 
-    pub fn window(&self) -> &Window {
-        &self.window
-    }
-
-    pub fn resize(&mut self, new_size: &winit::dpi::PhysicalSize<u32>) {
+    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             // self.size = new_size;
             self.config.width = new_size.width;
@@ -246,37 +237,8 @@ impl State<'_> {
         self.scene.process_event(event, &self.queue);
         self.settings_controller.process_event(event);
         match event {
-            WindowEvent::Resized(new_size) => {
-                self.resize(new_size);
-                // On macos the window needs to be redrawn manually after resizing
-                let _ = self.render();
-                false
-            }
-            WindowEvent::RedrawRequested => {
-                self.update();
-                let _ = self.render();
-                self.sleep();
-                false
-            }
             &WindowEvent::CursorMoved { position, .. } => {
                 self.cursor_position = Some(position);
-                true
-            }
-            WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        physical_key: PhysicalKey::Code(KeyCode::F11),
-                        state: ElementState::Pressed,
-                        ..
-                    },
-                ..
-            } => {
-                if let Some(_) = self.window.fullscreen() {
-                    self.window.set_fullscreen(None);
-                } else {
-                    self.window
-                        .set_fullscreen(Some(Fullscreen::Borderless(None)));
-                }
                 true
             }
             _ => false,
@@ -308,7 +270,7 @@ impl State<'_> {
         self.prev_cursor_position = self.cursor_position;
     }
 
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&mut self, window: &Window) -> Result<(), wgpu::SurfaceError> {
         let render_start = Instant::now();
 
         let output = self.surface.get_current_texture()?;
@@ -357,7 +319,7 @@ impl State<'_> {
 
         self.frame_number += 1;
 
-        self.window.request_redraw();
+        // window.request_redraw();
 
         Ok(())
     }

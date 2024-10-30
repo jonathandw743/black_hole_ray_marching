@@ -4,7 +4,7 @@ use crate::{
     otheruniforms::{BufferContent, IncValue, OtherUniform, OtherUniforms},
     podbool::PodBool,
     texture::Texture,
-    uniforms::CameraUniform,
+    uniforms::{BlackHole, BlackHolesUniform, CameraUniform},
     vertex::Vertex,
     vertices::VERTICES,
 };
@@ -13,7 +13,7 @@ use glam::{uvec2, vec2, vec3, vec4, UVec2, Vec2, Vec3, Vec4Swizzles};
 
 use std::{default, f32::consts::PI};
 
-use wgpu::util::DeviceExt;
+use wgpu::{include_wgsl, util::DeviceExt};
 
 use winit::{
     dpi::PhysicalPosition,
@@ -35,18 +35,14 @@ pub struct Scene {
     pub other_uniforms: OtherUniforms<6>,
     pub other_uniforms_buffer: wgpu::Buffer,
 
+    pub black_holes_uniform: BlackHolesUniform<10>,
+    pub black_holes_uniform_buffer: wgpu::Buffer,
+
     pub bind_group: wgpu::BindGroup,
 
     pub space_texture_bind_group: wgpu::BindGroup,
 
     pub render_pipeline: wgpu::RenderPipeline,
-
-    pub vertex_buffer: wgpu::Buffer,
-    pub index_buffer: wgpu::Buffer,
-    pub num_indices: u32,
-
-    pub resolution_uniform: UVec2,
-    pub resolution_uniform_buffer: wgpu::Buffer,
 }
 
 impl Scene {
@@ -56,15 +52,6 @@ impl Scene {
         config: &wgpu::SurfaceConfiguration,
         render_blackout: bool,
     ) -> Self {
-        let resolution_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            size: std::mem::size_of::<UVec2>() as wgpu::BufferAddress,
-            label: Some("scene resolution_uniform_buffer"),
-            mapped_at_creation: false,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let resolution_uniform = Self::create_resolution(queue, config, &resolution_uniform_buffer);
-
         let camera = Camera {
             pos: (0.0, 0.0, -20.0).into(),
             dir: (0.0, 0.0, 1.0).into(),
@@ -91,25 +78,17 @@ impl Scene {
             KeyCode::PageDown,
             [
                 OtherUniform {
-                    label: "swartschild radius".into(),
-                    // shader_stage: ShaderStages::FRAGMENT,
+                    label: "dist_to_surfaces_mult".into(),
                     inc_value: Box::new(IncValue {
-                        value: 1.0,
-                        inc: 0.2,
-                    }),
-                },
-                OtherUniform {
-                    label: "max delta time".into(),
-                    inc_value: Box::new(IncValue {
-                        value: 0.5,
-                        inc: 0.02,
-                    }),
-                },
-                OtherUniform {
-                    label: "background brightness".into(),
-                    inc_value: Box::new(IncValue {
-                        value: 0.5,
+                        value: 0.9,
                         inc: 0.1,
+                    }),
+                },
+                OtherUniform {
+                    label: "dist_to_singularity_squared_mult".into(),
+                    inc_value: Box::new(IncValue {
+                        value: 10.0,
+                        inc: 1.0,
                     }),
                 },
                 OtherUniform {
@@ -120,29 +99,55 @@ impl Scene {
                     }),
                 },
                 OtherUniform {
-                    label: "max view distance".into(),
+                    label: "min_dist".into(),
                     inc_value: Box::new(IncValue {
-                        value: 250.0,
-                        inc: 1.0,
+                        value: 0.001,
+                        inc: 0.0001,
                     }),
                 },
                 OtherUniform {
-                    label: "distortion power".into(),
+                    label: "max_dist".into(),
+                    inc_value: Box::new(IncValue {
+                        value: 250.0,
+                        inc: 5.0,
+                    }),
+                },
+                OtherUniform {
+                    label: "distortion_power".into(),
                     inc_value: Box::new(IncValue {
                         value: 1.0,
-                        inc: 0.2,
+                        inc: 0.1,
                     }),
                 },
             ],
         );
 
         let other_uniforms_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("other uniforms"),
+            label: Some("other_uniforms_buffer"),
             contents: &other_uniforms.uniform_buffer_content(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
+        let black_holes_uniform = BlackHolesUniform::new([
+            BlackHole {
+                pos: vec3(0.0, 0.0, 0.0),
+                rs: 1.0,
+            },
+            BlackHole {
+                pos: vec3(10.0, 0.0, 0.0),
+                rs: 1.0,
+            },
+        ]);
+
+        let black_holes_uniform_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("other_uniforms_buffer"),
+                contents: &black_holes_uniform.uniform_buffer_content(),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("scene bind_group_layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -164,11 +169,21 @@ impl Scene {
                     },
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
-            label: Some("scene bind_group_layout"),
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("scene bind_group"),
             layout: &bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -179,24 +194,27 @@ impl Scene {
                     binding: 1,
                     resource: other_uniforms_buffer.as_entire_binding(),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: black_holes_uniform_buffer.as_entire_binding(),
+                },
             ],
-            label: Some("scene bind_group"),
         });
-        
+
         cfg_if! {
             if #[cfg(target_arch = "wasm32")] {
-                let space_bytes = include_bytes!("space_2048x1024.jpg");
+                // let space_bytes = include_bytes!("space_2048x1024.jpg");
                 let space_bytes = include_bytes!("space_4096x2048.jpg");
             } else {
                 let space_bytes = include_bytes!("space_4096x2048.jpg");
-                // let space_bytes = include_bytes!("space_2048x1024.jpg");
-                // let space_bytes = include_bytes!("dark_space.jpg");
             }
         }
-        let space_texture = Texture::from_bytes(&device, &queue, space_bytes, "space").unwrap();
+        let space_texture =
+            Texture::from_bytes(&device, &queue, space_bytes, "space_texture").unwrap();
 
         let space_texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("space_bind_group_layout"),
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
@@ -215,7 +233,6 @@ impl Scene {
                         count: None,
                     },
                 ],
-                label: Some("space_bind_group_layout"),
             });
 
         let space_texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -233,11 +250,7 @@ impl Scene {
             label: Some("space_bind_group"),
         });
 
-        // or include_wgsl!
-        let black_hole_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("black_hole_shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("./black_hole_maybe.wgsl").into()),
-        });
+        let black_hole_shader = device.create_shader_module(include_wgsl!("black_holes.wgsl"));
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -295,20 +308,6 @@ impl Scene {
             cache: None,
         });
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(VERTICES),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(INDICES),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-
-        let num_indices = INDICES.len() as u32;
-
         Self {
             camera,
             camera_controller,
@@ -319,18 +318,14 @@ impl Scene {
             other_uniforms,
             other_uniforms_buffer,
 
+            black_holes_uniform,
+            black_holes_uniform_buffer,
+
             bind_group,
 
             space_texture_bind_group,
 
             render_pipeline,
-
-            vertex_buffer,
-            index_buffer,
-            num_indices,
-
-            resolution_uniform,
-            resolution_uniform_buffer,
         }
     }
 
@@ -344,42 +339,12 @@ impl Scene {
         return resolution_uniform;
     }
 
-    // pub fn create_output_texture(
-    //     device: &wgpu::Device,
-    //     config: &wgpu::SurfaceConfiguration,
-    // ) -> (wgpu::Texture, wgpu::TextureView) {
-    //     let output_texture = device.create_texture(&wgpu::TextureDescriptor {
-    //         label: Some("scene output_texture"),
-    //         mip_level_count: 1,
-    //         size: wgpu::Extent3d {
-    //             width: config.width,
-    //             height: config.height,
-    //             depth_or_array_layers: 1,
-    //         },
-    //         format: wgpu::TextureFormat::Bgra8UnormSrgb,
-    //         dimension: wgpu::TextureDimension::D2,
-    //         usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-    //         sample_count: 1,
-    //         view_formats: &[],
-    //     });
-
-    //     let output_texture_view =
-    //         output_texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-    //     return (output_texture, output_texture_view);
-    // }
-
     pub fn resize(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        // new_size: winit::dpi::PhysicalSize<u32>,
         config: &wgpu::SurfaceConfiguration,
-        // input_texture_view: &wgpu::TextureView,
     ) {
-        self.resolution_uniform =
-            Self::create_resolution(queue, config, &self.resolution_uniform_buffer);
-
         self.camera.aspect = config.width as f32 / config.height as f32;
     }
 
@@ -392,52 +357,9 @@ impl Scene {
                 &self.other_uniforms.uniform_buffer_content(),
             );
         }
-
         [
             other_uniforms_event_result,
             self.camera_controller.process_event(event),
-            // match event {
-            //     WindowEvent::KeyboardInput {
-            //         input:
-            //             KeyboardInput {
-            //                 state: ElementState::Pressed,
-            //                 ..
-            //             },
-            //         ..
-            //     } => {
-            //         {
-            //             let positions = vec![vec2(3.0, 1.0)];
-            //             // let positions = vec![vec2(3.0, 1.0), vec2(-1.0, 1.0), vec2(-1.0, -3.0)];
-            //
-            //             println!("{:?}", self.camera.build_view_projection_matrix().inverse());
-            //             // println!(
-            //             //     "{:?}",
-            //             //     camera.build_view_projection_matrix() * vec4(0.0, 0.0, 100.0, 1.0)
-            //             // );
-            //             // println!(
-            //             //     "{:?}",
-            //             //     camera.build_view_projection_matrix() * vec4(1.0, 0.0, 0.0, 1.0)
-            //             // );
-            //             // println!(
-            //             //     "{:?}",
-            //             //     camera.build_view_projection_matrix() * vec4(1.0, 0.0, 30.0, 1.0)
-            //             // );
-            //             for pos in positions {
-            //                 let clip_pos_hom = vec4(pos.x, pos.y, 0.0, 1.0);
-            //                 let mut world_pos_hom =
-            //                     self.camera.build_view_projection_matrix().inverse() * clip_pos_hom;
-            //                 world_pos_hom /= world_pos_hom.w;
-            //                 // println!("{:?}", world_pos_hom.xyz() - self.camera.pos);
-            //                 // println!(
-            //                 //     "{:?}",
-            //                 //     self.camera.pos_to_world_space_screen_triangle(pos.x, pos.y)
-            //                 // );
-            //             }
-            //             true
-            //         }
-            //     }
-            //     _ => false,
-            // },
         ]
         .iter()
         .any(|&result| result)
@@ -467,8 +389,6 @@ impl Scene {
         queue.write_buffer(&self.camera_uniform_buffer, 0, &data);
     }
 
-    // renders the scene onto the given view(s)
-    // if none are given, then the render will have no output
     pub fn render(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -511,15 +431,8 @@ impl Scene {
         });
 
         render_pass.set_pipeline(&self.render_pipeline);
-
-        // render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        // render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-
         render_pass.set_bind_group(0, &self.bind_group, &[]);
-
         render_pass.set_bind_group(1, &self.space_texture_bind_group, &[]);
-
-        // render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
         render_pass.draw(0..3, 0..1);
     }
 }
