@@ -60,7 +60,9 @@ struct Uniforms {
     min_dist: f32,
     max_dist: f32,
     distortion_power: f32,
-    // 24B
+    debug_colours: u32,
+    blackout_requires_ray_towards_black_hole: u32
+    // 40B
     // padding?
 }
 
@@ -83,7 +85,7 @@ const HALF_PI = 1.57079632679;
 const MAX_ITERATIONS = 1000;
 
 fn u32_to_bool(n: u32) -> bool {
-    return n != 0u;
+    return n == 0u;
 }
 
 fn sdf_sphere(p: vec3<f32>, centre: vec3<f32>, r: f32) -> f32 {
@@ -117,7 +119,6 @@ fn sdf(p: vec3<f32>) -> f32 {
         let sd_accretion_disk = sdf_accretion_disk(p, vec3<f32>(black_holes[i].pos), 6.0 * black_holes[i].rs, 3.0 * black_holes[i].rs);
         sd = min(sd, sd_accretion_disk);
     }
-    // sd = min(sd, sdf_sphere(p, vec3f(0.0), black_holes[0].rs));
     return sd;
 }
 
@@ -191,28 +192,6 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
             if (black_holes[i].rs == 0.0) { break; }
             dists_to_singularities[i] = length(photon.ro - black_holes[i].pos);
         }
-        // if u32_to_bool(u.blackout_eh) {
-        //     if dot(photon.ro, photon.rd) < 0.0 && length(photon.ro) < black_holes[0].rs {
-        //         return vec3f(0.0);
-        //     } 
-        //     // if dot(photon.rd, photon.ro) < 0.0 {
-        //     //     for (var i = 0; i < MAX_BLACK_HOLE_COUNT; i++) {
-        //     //         if (black_holes[i].rs == 0.0) { break; }
-        //     //         if (dists_to_singularities[i] < 1.0) {
-        //     //             return vec3f(0.0);
-        //     //         }
-        //     //     }
-        //     // }
-        //     // for (var i = 0; i < MAX_BLACK_HOLE_COUNT; i++) {
-        //     //     if (black_holes[i].rs == 0.0) { break; }
-        //     //     if dists_to_singularities[i] > 1.0 {
-        //     //         has_been_outside_ehs[i] = true;
-        //     //     } else if has_been_outside_ehs[i] {
-        //     //         return vec3f(0.0);
-        //     //     }
-        //     // }
-        // }
-
         let dist_to_surfaces = sdf(photon.ro);
         if dist_to_surfaces < u.min_dist {
             return vec3<f32>(1.0);
@@ -249,27 +228,15 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
         // let delta_photon = get_delta_photon_rk4(photon, delta_time, h2s);
         let ro_k1 = delta_time * photon.rd;
         let rd_k1 = delta_time * rd_derivative(photon.ro, h2s);
-        // if length(photon.ro + ro_k1) < black_holes[0].rs {
-        //     return vec3f(0.0);
-        // }
         
         let ro_k2 = delta_time * (photon.rd + 0.5 * rd_k1);
         let rd_k2 = delta_time * rd_derivative(photon.ro + 0.5 * ro_k1, h2s);
-        // if length(photon.ro + ro_k2) < black_holes[0].rs {
-        //     return vec3f(0.0);
-        // }
         
         let ro_k3 = delta_time * (photon.rd + 0.5 * rd_k2);
         let rd_k3 = delta_time * rd_derivative(photon.ro + 0.5 * ro_k2, h2s);
-        // if length(photon.ro + ro_k3) < black_holes[0].rs {
-        //     return vec3f(0.0);
-        // }
         
         let ro_k4 = delta_time * (photon.rd + rd_k3);
         let rd_k4 = delta_time * rd_derivative(photon.ro + ro_k3, h2s);
-        // if length(photon.ro + ro_k3) < black_holes[0].rs {
-        //     return vec3f(0.0);
-        // }
 
         let delta_ro = (ro_k1 + 2.0 * ro_k2 + 2.0 * ro_k3 + ro_k4) / 6.0;
         let delta_rd = (rd_k1 + 2.0 * rd_k2 + 2.0 * rd_k3 + rd_k4) / 6.0;
@@ -288,7 +255,7 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
         if u32_to_bool(u.blackout_eh) {
             for (var i = 0; i < MAX_BLACK_HOLE_COUNT; i++) {
                 if (black_holes[i].rs == 0.0) { break; }
-                if length(photon.ro - black_holes[i].pos) < black_holes[i].rs {
+                if dists_to_singularities[i] < black_holes[i].rs && (!u32_to_bool(u.blackout_requires_ray_towards_black_hole) || dot(photon.ro, photon.rd) < 0.0) {
                     return vec3f(0.0);
                 }
             }
@@ -296,9 +263,14 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
 
         distance_travelled += delta_time;
         if distance_travelled > u.max_dist {
-            // return vec3f(1.0, 0.0, 0.0);
+            if u32_to_bool(u.debug_colours) {
+                return vec3f(1.0, 0.0, 0.0);
+            }
             break;
         }
+    }
+    if u32_to_bool(u.debug_colours) {
+        return vec3f(0.0, 1.0, 0.0);
     }
     // any unit vector
     let normalized_final_rd = normalize(photon.rd);
@@ -313,7 +285,6 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
     let bg_col = textureSampleLevel(t_diffuse, s_diffuse, vec2<f32>(x, 1.0 - y), 0.0).xyz;
     let mapped_bg_col = map_bg_col(bg_col);
     return mapped_bg_col;
-    // return vec3f(0.0, 1.0, 0.0);
 }
 
 struct FragmentOutput {

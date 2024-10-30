@@ -32,7 +32,7 @@ pub struct Scene {
     pub camera_uniform: CameraUniform,
     pub camera_uniform_buffer: wgpu::Buffer,
 
-    pub other_uniforms: OtherUniforms<6>,
+    pub other_uniforms: OtherUniforms<8>,
     pub other_uniforms_buffer: wgpu::Buffer,
 
     pub black_holes_uniform: BlackHolesUniform<10>,
@@ -94,7 +94,7 @@ impl Scene {
                 OtherUniform {
                     label: "blackout event horizon".into(),
                     inc_value: Box::new(IncValue {
-                        value: PodBool::r#false(),
+                        value: PodBool::r#true(),
                         inc: PodBool::r#true(),
                     }),
                 },
@@ -117,6 +117,20 @@ impl Scene {
                     inc_value: Box::new(IncValue {
                         value: 1.0,
                         inc: 0.1,
+                    }),
+                },
+                OtherUniform {
+                    label: "debug_colours".into(),
+                    inc_value: Box::new(IncValue {
+                        value: PodBool::r#false(),
+                        inc: PodBool::r#true(),
+                    }),
+                },
+                OtherUniform {
+                    label: "blackout_requires_ray_towards_black_hole".into(),
+                    inc_value: Box::new(IncValue {
+                        value: PodBool::r#false(),
+                        inc: PodBool::r#true(),
                     }),
                 },
             ],
