@@ -78,9 +78,12 @@ pub struct BlackHole {
     pub rs: f32,
 }
 
+// N is the const MAX_BLACK_HOLE_COUNT in the black hole shader
+// count is the actual number of black holes
 #[derive(ShaderType)]
 pub struct BlackHolesUniform<const N: usize> {
     pub black_holes: [BlackHole; N],
+    pub count: u32,
 }
 
 impl<const N: usize> BlackHolesUniform<N> {
@@ -93,7 +96,8 @@ impl<const N: usize> BlackHolesUniform<N> {
             black_holes[i] = black_holes_in[i];
         }
         Self {
-            black_holes
+            black_holes,
+            count: M as u32,
         }
     }
 }

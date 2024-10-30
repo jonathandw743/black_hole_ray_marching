@@ -45,17 +45,22 @@ struct BlackHole {
     // 16B
 }
 
+struct BlackHolesUniform {
+    black_holes: array<BlackHole, MAX_BLACK_HOLE_COUNT>,
+    count: u32,
+}
+
 struct Photon {
     ro: vec3<f32>,
     rd: vec3<f32>,
 }
 
-const MAX_BLACK_HOLE_COUNT = 10;
+const MAX_BLACK_HOLE_COUNT = 10u;
 
 struct Uniforms {
     // 0B
     dist_to_surfaces_mult: f32,
-    dist_to_singularity_mult: f32,
+    dist_to_singularity_squared_mult: f32,
     blackout_eh: u32,
     min_dist: f32,
     max_dist: f32,
@@ -67,11 +72,10 @@ struct Uniforms {
 }
 
 @group(0) @binding(1)
-var<uniform> u: Uniforms;
+var<uniform> uniforms: Uniforms;
 
-// if we ever find a black hole with rs = 0, this is considered the end of the array
 @group(0) @binding(2)
-var<uniform> black_holes: array<BlackHole, MAX_BLACK_HOLE_COUNT>;
+var<uniform> black_holes_uniform: BlackHolesUniform;
 
 @group(1) @binding(0)
 var t_diffuse: texture_2d<f32>;
@@ -83,6 +87,7 @@ const TWO_PI = 6.28318530718;
 const ONE_PI = 3.14159265359;
 const HALF_PI = 1.57079632679;
 const MAX_ITERATIONS = 1000;
+const PLANE_THICKNESS = 0.0;
 
 fn u32_to_bool(n: u32) -> bool {
     return n == 0u;
@@ -93,7 +98,7 @@ fn sdf_sphere(p: vec3<f32>, centre: vec3<f32>, r: f32) -> f32 {
 }
 
 fn sdf_plane(p: vec3<f32>, y: f32) -> f32 {
-    return abs(p.y - y) - 0.02;
+    return abs(p.y - y) - PLANE_THICKNESS;
 }
 
 fn sdf_cylinder(p: vec3<f32>, pos: vec2<f32>, radius: f32) -> f32 {
@@ -114,9 +119,12 @@ fn sdf_markers(p: vec3f) -> f32 {
 
 fn sdf(p: vec3<f32>) -> f32 {
     var sd = sdf_markers(p);
-    for (var i = 0; i < MAX_BLACK_HOLE_COUNT; i++) {
-        if (black_holes[i].rs == 0.0) { break; }
-        let sd_accretion_disk = sdf_accretion_disk(p, vec3<f32>(black_holes[i].pos), 6.0 * black_holes[i].rs, 3.0 * black_holes[i].rs);
+    for (var i = 0u; i < black_holes_uniform.count; i++) {
+        let sd_accretion_disk = sdf_accretion_disk(
+            p, vec3<f32>(black_holes_uniform.black_holes[i].pos),
+            6.0 * black_holes_uniform.black_holes[i].rs,
+            3.0 * black_holes_uniform.black_holes[i].rs
+        );
         sd = min(sd, sd_accretion_disk);
     }
     return sd;
@@ -125,10 +133,9 @@ fn sdf(p: vec3<f32>) -> f32 {
 fn rd_derivative(ro: vec3<f32>, h2s: array<f32, MAX_BLACK_HOLE_COUNT>) -> vec3<f32> {
     var res = vec3f(0.0);
     var varh2s = h2s;
-    for (var i = 0; i < MAX_BLACK_HOLE_COUNT; i++) {
-        if (black_holes[i].rs == 0.0) { break; }
-        let relative_pos = ro - black_holes[i].pos;
-        res += u.distortion_power * black_holes[i].rs * -1.5 * varh2s[i] * relative_pos / pow(dot(relative_pos, relative_pos), 2.5);
+    for (var i = 0u; i < black_holes_uniform.count; i++) {
+        let relative_pos = ro - black_holes_uniform.black_holes[i].pos;
+        res += uniforms.distortion_power * black_holes_uniform.black_holes[i].rs * -1.5 * varh2s[i] * relative_pos / pow(dot(relative_pos, relative_pos), 2.5);
     }
     return res;
 }
@@ -168,19 +175,18 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
     var photon = Photon(initial_photon.ro, initial_photon.rd);
 
     var h2s: array<f32, MAX_BLACK_HOLE_COUNT>;
-    for (var i = 0; i < MAX_BLACK_HOLE_COUNT; i++) {
-        if (black_holes[i].rs == 0.0) { break; }
-        let initial_ro_rd_cross = cross(photon.ro - black_holes[i].pos, photon.rd);
+    for (var i = 0u; i < black_holes_uniform.count; i++) {
+        let initial_ro_rd_cross = cross(photon.ro - black_holes_uniform.black_holes[i].pos, photon.rd);
         h2s[i] = dot(initial_ro_rd_cross, initial_ro_rd_cross);
     }
 
     var distance_travelled = 0.0;
 
-    var has_been_outside_ehs: array<bool, MAX_BLACK_HOLE_COUNT>;
-    for (var i = 0; i < MAX_BLACK_HOLE_COUNT; i++) {
-        if (black_holes[i].rs == 0.0) { break; }
-        has_been_outside_ehs[i] = false;
-    }
+    // var has_been_outside_ehs: array<bool, MAX_BLACK_HOLE_COUNT>;
+    // for (var i = 0u; i < MAX_BLACK_HOLE_COUNT; i++) {
+    //     if (black_holes_uniform.black_holes[i].rs == 0.0) { break; }
+    //     has_been_outside_ehs[i] = false;
+    // }
 
     for (var i = 0; i < MAX_ITERATIONS; i++) {
         // the photon should approach the singularity
@@ -188,12 +194,11 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
         // just like the ray approaches a surface in raymarching
         // there also be some distance to the singularity that will cause black
         var dists_to_singularities: array<f32, MAX_BLACK_HOLE_COUNT>;
-        for (var i = 0; i < MAX_BLACK_HOLE_COUNT; i++) {
-            if (black_holes[i].rs == 0.0) { break; }
-            dists_to_singularities[i] = length(photon.ro - black_holes[i].pos);
+        for (var i = 0u; i < black_holes_uniform.count; i++) {
+            dists_to_singularities[i] = length(photon.ro - black_holes_uniform.black_holes[i].pos);
         }
         let dist_to_surfaces = sdf(photon.ro);
-        if dist_to_surfaces < u.min_dist {
+        if dist_to_surfaces < uniforms.min_dist {
             return vec3<f32>(1.0);
         }
 
@@ -208,7 +213,7 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
         // if dist_to_surfaces_or_photon_sphere < 1.0 {
         //     m *= 0.1;
         // }
-        let adjusted_dist_to_surfaces_or_photon_sphere = dist_to_surfaces_or_photon_sphere * u.dist_to_surfaces_mult;
+        let adjusted_dist_to_surfaces_or_photon_sphere = dist_to_surfaces_or_photon_sphere * uniforms.dist_to_surfaces_mult;
 
         // the photon should be able to travel further if it is far away from the black hole
         // k * distance to singularity
@@ -219,9 +224,8 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
         // then apply the ray marching distance
         // 0.9 multiplier just to account for any error due to the curvature of the ray
         var delta_time = adjusted_dist_to_surfaces_or_photon_sphere;
-        for (var i = 0; i < MAX_BLACK_HOLE_COUNT; i++) {
-            if (black_holes[i].rs == 0.0) { break; }
-            delta_time = min(delta_time, u.dist_to_singularity_mult * dists_to_singularities[i] * dists_to_singularities[i] / u.max_dist);
+        for (var i = 0u; i < black_holes_uniform.count; i++) {
+            delta_time = min(delta_time, uniforms.dist_to_singularity_squared_mult * dists_to_singularities[i] * dists_to_singularities[i]);
         }
 
         // how the photon should move given the desired distance and the current state of the photonn
@@ -252,24 +256,27 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
         // but its a good enough appoximation
         photon.rd += delta_photon.rd;
 
-        if u32_to_bool(u.blackout_eh) {
-            for (var i = 0; i < MAX_BLACK_HOLE_COUNT; i++) {
-                if (black_holes[i].rs == 0.0) { break; }
-                if dists_to_singularities[i] < black_holes[i].rs && (!u32_to_bool(u.blackout_requires_ray_towards_black_hole) || dot(photon.ro, photon.rd) < 0.0) {
+        if u32_to_bool(uniforms.blackout_eh) {
+            for (var i = 0u; i < 20u; i++) {
+                // if (black_holes_uniform.black_holes[i].rs == 0.0) { break; }
+                if dists_to_singularities[i] < black_holes_uniform.black_holes[i].rs && (
+                    !u32_to_bool(uniforms.blackout_requires_ray_towards_black_hole) || 
+                    dot(photon.ro, photon.rd) < 0.0
+                ) {
                     return vec3f(0.0);
                 }
             }
         }
 
         distance_travelled += delta_time;
-        if distance_travelled > u.max_dist {
-            if u32_to_bool(u.debug_colours) {
+        if distance_travelled > uniforms.max_dist {
+            if u32_to_bool(uniforms.debug_colours) {
                 return vec3f(1.0, 0.0, 0.0);
             }
             break;
         }
     }
-    if u32_to_bool(u.debug_colours) {
+    if u32_to_bool(uniforms.debug_colours) {
         return vec3f(0.0, 1.0, 0.0);
     }
     // any unit vector

@@ -80,15 +80,15 @@ impl Scene {
                 OtherUniform {
                     label: "dist_to_surfaces_mult".into(),
                     inc_value: Box::new(IncValue {
-                        value: 0.9,
-                        inc: 0.1,
+                        value: 0.6,
+                        inc: 0.05,
                     }),
                 },
                 OtherUniform {
                     label: "dist_to_singularity_squared_mult".into(),
                     inc_value: Box::new(IncValue {
-                        value: 10.0,
-                        inc: 1.0,
+                        value: 0.04,
+                        inc: 0.004,
                     }),
                 },
                 OtherUniform {
