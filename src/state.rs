@@ -1,17 +1,21 @@
 use anyhow::{anyhow, Result};
+use egui::ClippedPrimitive;
+use egui_wgpu::ScreenDescriptor;
 use glam::uvec2;
 use std::iter;
 use std::sync::Arc;
+use wgpu::rwh::HasDisplayHandle;
 use wgpu::{
     Device, Instance, InstanceFlags, Queue, Surface, SurfaceConfiguration, Texture,
     TextureViewDescriptor,
 };
 use winit::dpi::PhysicalPosition;
-use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::keyboard::{Key, KeyCode, PhysicalKey};
 use winit::window::Fullscreen;
 use winit::{event::*, window::Window};
 
 use crate::copy::Copy;
+use crate::gui::Gui;
 //use crate::bloom::Bloom;
 // use crate::bloom::Bloom;
 // use crate::downsampling::{self, Downsampling};
@@ -62,6 +66,9 @@ pub struct State<'a> {
     pub cursor_position: Option<PhysicalPosition<f64>>,
 
     pub frame_number: u32,
+
+    pub gui_enabled: bool,
+    pub gui: Gui,
 }
 
 impl State<'_> {
@@ -108,7 +115,8 @@ impl State<'_> {
                 },
                 None,
             )
-            .await.map_err(|_| anyhow!("Failed to request device"))?;
+            .await
+            .map_err(|_| anyhow!("Failed to request device"))?;
 
         let swapchain_capabilities = surface.get_capabilities(&adapter);
         let swapchain_format = swapchain_capabilities.formats[0];
@@ -179,6 +187,8 @@ impl State<'_> {
 
         let delta_time = Duration::from_secs_f32(0.0);
 
+        let gui = Gui::new(window, &device, &config);
+
         Ok(Self {
             surface,
             device,
@@ -211,6 +221,9 @@ impl State<'_> {
             cursor_position: None,
 
             frame_number: 0,
+
+            gui_enabled: true,
+            gui,
         })
     }
 
@@ -236,9 +249,22 @@ impl State<'_> {
     pub fn process_event(&mut self, event: &WindowEvent) -> bool {
         self.scene.process_event(event, &self.queue);
         self.settings_controller.process_event(event);
+        self.gui.process_event(event);
         match event {
             &WindowEvent::CursorMoved { position, .. } => {
                 self.cursor_position = Some(position);
+                true
+            }
+            &WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(KeyCode::Tab),
+                        state: ElementState::Pressed,
+                        ..
+                    },
+                ..
+            } => {
+                self.gui_enabled = !self.gui_enabled;
                 true
             }
             _ => false,
@@ -270,7 +296,7 @@ impl State<'_> {
         self.prev_cursor_position = self.cursor_position;
     }
 
-    pub fn render(&mut self, window: &Window) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let render_start = Instant::now();
 
         let output = self.surface.get_current_texture()?;
@@ -294,6 +320,16 @@ impl State<'_> {
         );
 
         self.copy.pass(&mut encoder, 1280, 720);
+
+        if self.gui_enabled {
+            self.gui.render(
+                &mut encoder,
+                &self.device,
+                &self.queue,
+                &output_view,
+                &self.config,
+            );
+        }
 
         // self.kawase_downsampling.render(&mut encoder, Some(self.kawase_upsampling.input_texture_view()));
         // self.kawase_upsampling.render(&mut encoder, Some(&output_view));

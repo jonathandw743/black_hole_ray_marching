@@ -43,6 +43,7 @@ mod kawase_upsampling;
 mod copy;
 mod remix;
 mod state;
+mod gui;
 
 enum UserEvent {
     ApplicationCreated(State<'static>),
@@ -168,7 +169,7 @@ impl ApplicationHandler<UserEvent> for ApplicationWindow {
             }
             WindowEvent::RedrawRequested => {
                 app.update();
-                if let Err(e) = app.render(&window) {
+                if let Err(e) = app.render() {
                     if e == wgpu::SurfaceError::Outdated {
                         let size = window.inner_size();
                         app.resize(size);

@@ -32,7 +32,7 @@ pub struct Scene {
     pub camera_uniform: CameraUniform,
     pub camera_uniform_buffer: wgpu::Buffer,
 
-    pub other_uniforms: OtherUniforms<8>,
+    pub other_uniforms: OtherUniforms<9>,
     pub other_uniforms_buffer: wgpu::Buffer,
 
     pub black_holes_uniform: BlackHolesUniform<10>,
@@ -133,6 +133,13 @@ impl Scene {
                         inc: PodBool::r#true(),
                     }),
                 },
+                OtherUniform {
+                    label: "photon_sphere".into(),
+                    inc_value: Box::new(IncValue {
+                        value: PodBool::r#false(),
+                        inc: PodBool::r#true(),
+                    }),
+                },
             ],
         );
 
@@ -146,10 +153,12 @@ impl Scene {
             BlackHole {
                 pos: vec3(0.0, 0.0, 0.0),
                 rs: 1.0,
+                accretion_disk_size: 0.0,
             },
             BlackHole {
-                pos: vec3(10.0, 0.0, 0.0),
+                pos: vec3(3.0, 0.0, 0.0),
                 rs: 1.0,
+                accretion_disk_size: 0.0,
             },
         ]);
 

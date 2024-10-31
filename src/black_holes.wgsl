@@ -42,6 +42,7 @@ struct BlackHole {
     // 0B
     pos: vec3f,
     rs: f32,
+    accretion_disk_size: f32,
     // 16B
 }
 
@@ -66,7 +67,8 @@ struct Uniforms {
     max_dist: f32,
     distortion_power: f32,
     debug_colours: u32,
-    blackout_requires_ray_towards_black_hole: u32
+    blackout_requires_ray_towards_black_hole: u32,
+    photon_sphere: u32,
     // 40B
     // padding?
 }
@@ -88,13 +90,14 @@ const ONE_PI = 3.14159265359;
 const HALF_PI = 1.57079632679;
 const MAX_ITERATIONS = 1000;
 const PLANE_THICKNESS = 0.0;
+const INNERMOST_STABLE_ORBIT = 3.0;
 
 fn u32_to_bool(n: u32) -> bool {
     return n == 0u;
 }
 
 fn sdf_sphere(p: vec3<f32>, centre: vec3<f32>, r: f32) -> f32 {
-    return length(centre - p) - r;
+    return length(p - centre) - r;
 }
 
 fn sdf_plane(p: vec3<f32>, y: f32) -> f32 {
@@ -122,8 +125,8 @@ fn sdf(p: vec3<f32>) -> f32 {
     for (var i = 0u; i < black_holes_uniform.count; i++) {
         let sd_accretion_disk = sdf_accretion_disk(
             p, vec3<f32>(black_holes_uniform.black_holes[i].pos),
-            6.0 * black_holes_uniform.black_holes[i].rs,
-            3.0 * black_holes_uniform.black_holes[i].rs
+            black_holes_uniform.black_holes[i].accretion_disk_size * black_holes_uniform.black_holes[i].rs,
+            INNERMOST_STABLE_ORBIT * black_holes_uniform.black_holes[i].rs
         );
         sd = min(sd, sd_accretion_disk);
     }
@@ -197,7 +200,8 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
         for (var i = 0u; i < black_holes_uniform.count; i++) {
             dists_to_singularities[i] = length(photon.ro - black_holes_uniform.black_holes[i].pos);
         }
-        let dist_to_surfaces = sdf(photon.ro);
+
+        var dist_to_surfaces = sdf(photon.ro);
         if dist_to_surfaces < uniforms.min_dist {
             return vec3<f32>(1.0);
         }
@@ -206,14 +210,20 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
         // distance of 1.5 * r_s away
         // we say that if a photon hits this sphere, it goes into temporary orbit around the black hole
         // https://upload.wikimedia.org/wikipedia/commons/2/27/Black_Hole_Shadow.gif
-        // let photon_sphere_dist = sdf_sphere(photon.ro, -normalize(initial_photon.ro) * 1.5 * u, 0.075);
 
-        let dist_to_surfaces_or_photon_sphere = dist_to_surfaces;//min(dist_to_surfaces, photon_sphere_dist);
-        var m = dist_to_surfaces_or_photon_sphere;
-        // if dist_to_surfaces_or_photon_sphere < 1.0 {
-        //     m *= 0.1;
-        // }
-        let adjusted_dist_to_surfaces_or_photon_sphere = dist_to_surfaces_or_photon_sphere * uniforms.dist_to_surfaces_mult;
+        if u32_to_bool(uniforms.photon_sphere) {
+            var photon_sphere_dist = uniforms.max_dist;
+            for (var i = 0u; i < black_holes_uniform.count; i++) {
+                photon_sphere_dist = min(
+                    photon_sphere_dist,
+                    sdf_sphere(photon.ro, black_holes_uniform.black_holes[i].pos - normalize(initial_photon.ro) * 1.5 * black_holes_uniform.black_holes[i].rs, 0.1)
+                );
+            }
+            if photon_sphere_dist < uniforms.min_dist {
+                return vec3<f32>(1.0, 1.0, 0.0);
+            }
+            dist_to_surfaces = min(dist_to_surfaces, photon_sphere_dist);
+        }
 
         // the photon should be able to travel further if it is far away from the black hole
         // k * distance to singularity
@@ -223,7 +233,7 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
         // this means max view distance can be increased massively
         // then apply the ray marching distance
         // 0.9 multiplier just to account for any error due to the curvature of the ray
-        var delta_time = adjusted_dist_to_surfaces_or_photon_sphere;
+        var delta_time = dist_to_surfaces * uniforms.dist_to_surfaces_mult;
         for (var i = 0u; i < black_holes_uniform.count; i++) {
             delta_time = min(delta_time, uniforms.dist_to_singularity_squared_mult * dists_to_singularities[i] * dists_to_singularities[i]);
         }

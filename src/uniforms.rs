@@ -72,10 +72,11 @@ impl CameraUniform {
     }
 }
 
-#[derive(ShaderType, Debug, Copy, Clone)]
+#[derive(ShaderType, Debug, Copy, Clone, Default)]
 pub struct BlackHole {
     pub pos: Vec3,
     pub rs: f32,
+    pub accretion_disk_size: f32,
 }
 
 // N is the const MAX_BLACK_HOLE_COUNT in the black hole shader
@@ -88,10 +89,7 @@ pub struct BlackHolesUniform<const N: usize> {
 
 impl<const N: usize> BlackHolesUniform<N> {
     pub fn new<const M: usize>(black_holes_in: [BlackHole; M]) -> Self {
-        let mut black_holes = [BlackHole {
-            pos: vec3(0.0, 0.0, 0.0),
-            rs: 0.0,
-        }; N];
+        let mut black_holes = [Default::default(); N];
         for i in 0..M.min(N) {
             black_holes[i] = black_holes_in[i];
         }
