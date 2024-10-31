@@ -106,11 +106,14 @@ where
 trait Foo {
     fn write_into_buffer(&self, buffer: &mut Vec<u8>, offset: usize);
     fn size(&self) -> NonZeroU64;
+    fn increment(&mut self);
+    fn decrement(&mut self);
 }
 
 impl<T, I> Foo for IncrementableOtherUniform<T, I>
 where
     T: ShaderType + WriteInto,
+    
 {
     fn write_into_buffer(&self, buffer: &mut Vec<u8>, offset: usize) {
         let mut writer = Writer::new(&self.other_uniform.value.value, buffer, offset).unwrap();
@@ -118,6 +121,14 @@ where
     }
     fn size(&self) -> NonZeroU64 {
         self.other_uniform.value.value.size()
+    }
+    fn increment(&mut self) {
+        self.other_uniform.value = self.other_uniform.value.(&self.inc);
+        println!("new value: {:?}", self.value);
+    }
+    fn decrement(&mut self) {
+        self.value = self.value.increment(&self.inc.opposite());
+        println!("new value: {:?}", self.value);
     }
 }
 
