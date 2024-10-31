@@ -321,6 +321,7 @@ impl State<'_> {
 
         // self.copy.pass(&mut encoder, 1280, 720);
 
+        #[cfg(not(feature = "keyboard_controls"))]
         if self.gui_enabled {
             self.gui.render(
                 &mut encoder,
@@ -328,6 +329,8 @@ impl State<'_> {
                 &self.queue,
                 &output_view,
                 &self.config,
+                &mut self.scene.other_uniforms,
+                &self.scene.other_uniforms_buffer,
             );
         }
 
@@ -349,6 +352,7 @@ impl State<'_> {
         output.present();
 
         let render_time = Instant::now() - render_start;
+        #[cfg(feature = "logging")]
         if self.frame_number % 100 == 0 {
             dbg!(render_time);
         }

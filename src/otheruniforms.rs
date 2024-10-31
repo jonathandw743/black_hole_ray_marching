@@ -1,6 +1,7 @@
-use std::{fmt::Debug, num::NonZeroU64};
+use std::{borrow::BorrowMut, fmt::Debug, num::NonZeroU64};
 
-use egui::{Response, Ui};
+use bytemuck::{checked, Pod};
+use egui::{Context, LayerId, Response, Ui};
 use encase::{
     internal::{WriteInto, Writer},
     ShaderType,
@@ -12,6 +13,9 @@ use winit::{
 
 use crate::settings::number_from_virtual_key_code;
 
+// ----------------------------------------------------------------------------------------------
+//                                         Buffer Content Trait
+// ----------------------------------------------------------------------------------------------
 
 pub trait BufferContent {
     fn storage_buffer_content(&self) -> Vec<u8>;
@@ -35,6 +39,10 @@ where
     }
 }
 
+// ----------------------------------------------------------------------------------------------
+//                                         Other Uniform
+// ----------------------------------------------------------------------------------------------
+
 pub struct OtherUniform<T> {
     pub label: String,
     pub value: T,
@@ -52,7 +60,124 @@ where
     }
 }
 
-// #[derive(Debug)]
+pub trait OtherUniformTrait {
+    fn write_into_buffer(&self, buffer: &mut Vec<u8>, offset: usize);
+    fn size(&self) -> NonZeroU64;
+    fn label(&self) -> &str;
+}
+
+// ----------------------------------------------------------------------------------------------
+//                                         Gui Other Uniforms
+// ----------------------------------------------------------------------------------------------
+
+pub struct GuiOtherUniform<T> {
+    pub other_uniform: OtherUniform<T>,
+    pub ui_fn: Box<dyn FnMut(&mut Self, &mut Ui) -> ()>,
+}
+
+impl<T> OtherUniformTrait for GuiOtherUniform<T>
+where
+    T: ShaderType + WriteInto,
+{
+    fn label(&self) -> &str {
+        &self.other_uniform.label
+    }
+    fn write_into_buffer(&self, buffer: &mut Vec<u8>, offset: usize) {
+        let mut writer = Writer::new(&self.other_uniform.value, buffer, offset).unwrap();
+        self.other_uniform.value.write_into(&mut writer);
+    }
+    fn size(&self) -> NonZeroU64 {
+        self.other_uniform.value.size()
+    }
+}
+
+impl GuiOtherUniform<f32> {
+    pub fn new(other_uniform: OtherUniform<f32>, min: f32, max: f32) -> Self {
+        Self {
+            other_uniform,
+            ui_fn: Box::new(move |s: &mut Self, ui: &mut Ui| {
+                let _ = ui.label(&s.other_uniform.label);
+                let _ = ui.add(egui::Slider::new(&mut s.other_uniform.value, min..=max));
+            })
+        }
+    }
+}
+
+impl GuiOtherUniform<PodBool> {
+    pub fn new(other_uniform: OtherUniform<PodBool>) -> Self {
+        Self {
+            other_uniform,
+            ui_fn: Box::new(move |s: &mut Self, ui: &mut Ui| {
+                let mut checked = s.other_uniform.value.get();
+                let _ = ui.checkbox(&mut checked, &s.other_uniform.label);
+                s.other_uniform.value.set(checked);
+            })
+        }
+    }
+}
+
+impl<T> WriteInto for GuiOtherUniform<T>
+where
+    T: WriteInto,
+{
+    fn write_into<B>(&self, writer: &mut Writer<B>)
+    where
+        B: encase::internal::BufferMut,
+    {
+        self.other_uniform.write_into(writer);
+    }
+}
+
+pub trait GuiTrait {
+    fn ui(&mut self, ui: &mut Ui);
+}
+
+impl<T> GuiTrait for GuiOtherUniform<T> {
+    fn ui(&mut self, ui: &mut Ui) {
+        // Temporarily move `ui_fn` out of `self` to avoid borrowing conflicts
+        let mut ui_fn = std::mem::replace(&mut self.ui_fn, Box::new(|_, _| ()));
+        // Call `ui_fn` and replace it back into `self`
+        ui_fn(self, ui);
+        self.ui_fn = ui_fn;
+    }
+}
+
+pub trait OtherUniformGuiTrait: OtherUniformTrait + GuiTrait {}
+impl<T> OtherUniformGuiTrait for T where T: OtherUniformTrait + GuiTrait {}
+
+pub struct GuiOtherUniforms<const N: usize> {
+    pub other_uniforms: [Box<dyn OtherUniformGuiTrait>; N],
+}
+
+impl<const N: usize> GuiOtherUniforms<N> {
+    pub fn new(other_uniforms: [Box<dyn OtherUniformGuiTrait>; N]) -> Self {
+        Self { other_uniforms }
+    }
+    pub fn uniform_buffer_content(&self) -> Vec<u8> {
+        let mut buffer: Vec<u8> = Vec::new();
+        let mut pos = 0;
+        for other_uniform in &self.other_uniforms {
+            {
+                other_uniform.write_into_buffer(&mut buffer, pos);
+                pos += other_uniform.size().get() as usize;
+            }
+        }
+        for _i in buffer.len()..((buffer.len() as f32 / 16.0).ceil() * 16.0) as usize {
+            buffer.push(0u8);
+        }
+        buffer
+    }
+    pub fn ui(&mut self, ui: &mut Ui) {
+        for other_uniform in &mut self.other_uniforms {
+            other_uniform.ui(ui);
+        }       
+    }
+}
+
+// ----------------------------------------------------------------------------------------------
+//                                         Incrementable
+// ----------------------------------------------------------------------------------------------
+
 pub struct IncValue<T, I> {
     pub value: T,
     pub inc: I,
@@ -74,14 +199,17 @@ impl<T, I> IncValue<T, I>
 where
     T: Increment<I>,
     I: Opposite<I>,
+    T: Debug,
 {
     fn increment(&mut self) {
         self.value = self.value.increment(&self.inc);
-        // println!("new value: {:?}", self.value);
+        #[cfg(feature = "logging")]
+        println!("new value: {:?}", self.value);
     }
     fn decrement(&mut self) {
         self.value = self.value.increment(&self.inc.opposite());
-        // println!("new value: {:?}", self.value);
+        #[cfg(feature = "logging")]
+        println!("new value: {:?}", self.value);
     }
 }
 
@@ -101,43 +229,54 @@ where
     }
 }
 
-pub trait Foo {
-    fn write_into_buffer(&self, buffer: &mut Vec<u8>, offset: usize);
-    fn size(&self) -> NonZeroU64;
-    fn increment(&mut self);
-    fn decrement(&mut self);
-}
-
-impl<T, I> Foo for IncrementableOtherUniform<T, I>
+impl<T, I> OtherUniformTrait for IncrementableOtherUniform<T, I>
 where
     T: ShaderType + WriteInto,
-    T: Increment<I>,
-    I: Opposite<I>,
-    
 {
+    fn label(&self) -> &str {
+        &self.other_uniform.label
+    }
     fn write_into_buffer(&self, buffer: &mut Vec<u8>, offset: usize) {
         let mut writer = Writer::new(&self.other_uniform.value.value, buffer, offset).unwrap();
-        self.other_uniform.write_into(&mut writer);
+        self.other_uniform.value.value.write_into(&mut writer);
     }
     fn size(&self) -> NonZeroU64 {
         self.other_uniform.value.value.size()
     }
+}
+
+pub trait IncrementableTrait {
+    fn increment(&mut self);
+    fn decrement(&mut self);
+}
+
+impl<T, I> IncrementableTrait for IncrementableOtherUniform<T, I>
+where
+    T: Increment<I>,
+    I: Opposite<I>,
+    T: Debug,
+{
     fn increment(&mut self) {
         self.other_uniform.value.increment();
-        // println!("new value: {:?}", self.value);
+        #[cfg(feature = "logging")]
+        println!("new value: {:?}", self.other_uniform.value.value);
     }
     fn decrement(&mut self) {
         self.other_uniform.value.decrement();
-        // println!("new value: {:?}", self.value);
+        #[cfg(feature = "logging")]
+        println!("new value: {:?}", self.other_uniform.value.value);
     }
 }
 
+pub trait IncrementableOtherUniformTrait: OtherUniformTrait + IncrementableTrait {}
+impl<T> IncrementableOtherUniformTrait for T where T: OtherUniformTrait + IncrementableTrait {}
+
 pub struct IncrementableOtherUniforms<const N: usize> {
-    pub other_uniforms: [Box<dyn Foo>; N],
+    pub other_uniforms: [Box<dyn IncrementableOtherUniformTrait>; N],
 }
 
 impl<const N: usize> IncrementableOtherUniforms<N> {
-    pub fn new(other_uniforms: [Box<dyn Foo>; N]) -> Self {
+    pub fn new(other_uniforms: [Box<dyn IncrementableOtherUniformTrait>; N]) -> Self {
         Self { other_uniforms }
     }
     pub fn uniform_buffer_content(&self) -> Vec<u8> {
@@ -156,6 +295,10 @@ impl<const N: usize> IncrementableOtherUniforms<N> {
     }
 }
 
+// ----------------------------------------------------------------------------------------------
+//                                         Incrementable Controller
+// ----------------------------------------------------------------------------------------------
+
 pub struct IncrementableOtherUniformsControllerKeyboard {
     pub positive_modifier_key_code: KeyCode,
     pub negative_modifier_key_code: KeyCode,
@@ -163,17 +306,18 @@ pub struct IncrementableOtherUniformsControllerKeyboard {
 }
 
 impl IncrementableOtherUniformsControllerKeyboard {
-    pub fn new(
-        positive_modifier_key_code: KeyCode,
-        negative_modifier_key_code: KeyCode,
-    ) -> Self {
+    pub fn new(positive_modifier_key_code: KeyCode, negative_modifier_key_code: KeyCode) -> Self {
         Self {
             positive_modifier_key_code,
             negative_modifier_key_code,
             modifier_number_pressed: None,
         }
     }
-    pub fn process_event<const N: usize>(&mut self, event: &WindowEvent, other_uniforms: &mut IncrementableOtherUniforms<N>) -> bool {
+    pub fn process_event<const N: usize>(
+        &mut self,
+        event: &WindowEvent,
+        other_uniforms: &mut IncrementableOtherUniforms<N>,
+    ) -> bool {
         match event {
             WindowEvent::KeyboardInput {
                 event:
@@ -193,13 +337,14 @@ impl IncrementableOtherUniformsControllerKeyboard {
                 }
                 if let Some(number) = number_from_virtual_key_code(code) {
                     self.modifier_number_pressed = Some(number);
-                    // println!(
-                    //     "{}",
-                    //     match other_uniforms.get(number) {
-                    //         Some(other_uniform) => format!("{} selected", other_uniform.label),
-                    //         None => "nothing selected".into(),
-                    //     }
-                    // );
+                    #[cfg(feature = "logging")]
+                    println!(
+                        "{}",
+                        match other_uniforms.other_uniforms.get(number) {
+                            Some(other_uniform) => format!("{} selected", other_uniform.label()),
+                            None => "nothing selected".into(),
+                        }
+                    );
                     return true;
                 }
                 if let Some(modifier_number) = self.modifier_number_pressed {
@@ -220,6 +365,10 @@ impl IncrementableOtherUniformsControllerKeyboard {
         }
     }
 }
+
+// ----------------------------------------------------------------------------------------------
+//                                         primitive implementations
+// ----------------------------------------------------------------------------------------------
 
 pub trait Opposite<T> {
     fn opposite(&self) -> T;
@@ -294,10 +443,10 @@ impl PartialEq for PodBool {
 
 impl PodBool {
     pub fn r#true() -> Self {
-        Self { inner: 0 }
+        Self { inner: 1 }
     }
     pub fn r#false() -> Self {
-        Self { inner: 1 }
+        Self { inner: 0 }
     }
     pub fn set(&mut self, value: bool) {
         if value {

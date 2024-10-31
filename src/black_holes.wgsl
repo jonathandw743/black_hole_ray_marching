@@ -93,7 +93,7 @@ const PLANE_THICKNESS = 0.0;
 const INNERMOST_STABLE_ORBIT = 3.0;
 
 fn u32_to_bool(n: u32) -> bool {
-    return n == 0u;
+    return n != 0u;
 }
 
 fn sdf_sphere(p: vec3<f32>, centre: vec3<f32>, r: f32) -> f32 {
@@ -267,7 +267,7 @@ fn get_col(initial_photon: Photon) -> vec3<f32> {
         photon.rd += delta_photon.rd;
 
         if u32_to_bool(uniforms.blackout_eh) {
-            for (var i = 0u; i < 20u; i++) {
+            for (var i = 0u; i < black_holes_uniform.count; i++) {
                 // if (black_holes_uniform.black_holes[i].rs == 0.0) { break; }
                 if dists_to_singularities[i] < black_holes_uniform.black_holes[i].rs && (
                     !u32_to_bool(uniforms.blackout_requires_ray_towards_black_hole) || 

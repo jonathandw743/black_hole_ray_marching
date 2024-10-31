@@ -5,7 +5,7 @@ use egui_wgpu::ScreenDescriptor;
 use wgpu::{CommandEncoder, SurfaceConfiguration};
 use winit::{event::WindowEvent, window::Window};
 
-use crate::otheruniforms::{OtherUniform};
+use crate::otheruniforms::{GuiOtherUniform, GuiOtherUniforms, OtherUniform};
 
 // pub trait CreateUi {
 //     fn create_ui(&mut self, ui: Ui) -> Response;
@@ -13,10 +13,9 @@ use crate::otheruniforms::{OtherUniform};
 
 // impl CreateUi for OtherUniform {
 //     fn create_ui(&mut self, ui: Ui) -> Response {
-        
+
 //     }
 // }
-
 
 pub struct Gui {
     pub window: Arc<Window>,
@@ -63,14 +62,15 @@ impl Gui {
         }
     }
 
-    pub fn render(
+    pub fn render<const N: usize>(
         &mut self,
         encoder: &mut CommandEncoder,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         output_view: &wgpu::TextureView,
         config: &SurfaceConfiguration,
-        // &mut other_uniforms: OtherUniformsK,
+        other_uniforms: &mut GuiOtherUniforms<N>,
+        other_uniforms_buffer: &wgpu::Buffer,
     ) {
         let screen_descriptor = Self::screen_descriptor(config);
         let raw_input = self.egui_state.take_egui_input(&self.window);
@@ -78,11 +78,15 @@ impl Gui {
             // Create the side panel UI
             egui::SidePanel::left("side_panel").show(ctx, |ui| {
                 ui.heading("Controls");
-                if ui.button("Click me").clicked() {
-                    println!("Button was clicked!");
-                }
-                // ui.checkbox(&mut x, "hello");
-                ui.label("Hello, egui!")
+                ui.heading("Uniforms");
+                other_uniforms.ui(ui);
+                queue.write_buffer(
+                    &other_uniforms_buffer,
+                    0,
+                    &other_uniforms.uniform_buffer_content(),
+                );
+                ui.add_space(ui.available_height() - 20.0);
+                ui.label("Press Tab to Open/Close");
             });
         });
         self.egui_state

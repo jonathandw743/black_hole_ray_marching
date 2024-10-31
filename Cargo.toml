@@ -9,14 +9,11 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-#idk, take this out for building to wasm because thread-id doesn't have a get_internal for the wasm architecture
-# flame = "0.2.2"
-
 winit = "0.30.5"
 env_logger = "0.11.5"
 log = "0.4"
 wgpu = "22.1.0"
-bytemuck = { version = "1.12", features = [ "derive" ] }
+bytemuck = { version = "1.12", features = ["derive"] }
 anyhow = "1.0"
 aligned = "0.4.1"
 encase = { version = "0.6.1", features = ["glam"] }
@@ -25,20 +22,23 @@ cfg-if = "1.0.0"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 egui = { version = "0.29.1", features = ["document-features"] }
-egui-winit = { version = "0.29.1", default-features=false, features = [#"arboard",
-             "bytemuck",
-            #  + clipboard
-             "links",
-            #  smithay-clipboard
-             "wayland",
-             "webbrowser",
-             "x11","document-features"] }
+# arboard and clipboard features mess up something when compiling to wasm and they are unneeded
+egui-winit = { version = "0.29.1", default-features = false, features = [
+    #"arboard",
+    "bytemuck",
+    #"clipboard",
+    "links",
+    "smithay-clipboard",
+    "wayland",
+    "webbrowser",
+    "x11",
+    "document-features",
+] }
 egui-wgpu = { version = "0.29.1", features = ["wayland", "winit"] }
-
-[dependencies.image]
-version = "0.24"
-default-features = false
-features = ["png", "jpeg"]
+image = { version = "0.24", default-features = false, features = [
+    "png",
+    "jpeg",
+] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 pollster = "0.3.0"
@@ -46,22 +46,18 @@ pollster = "0.3.0"
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"
 console_log = "1.0.0"
-wgpu = { version = "22.1.0", features = ["webgpu"]}
-wasm-bindgen = "0.2"
-web-sys = { version = "0.3", features = [
-    "Document",
-    "Window",
-    "Element",
-]}
+wgpu = { version = "22.1.0", features = ["webgpu"] }
+# wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["Document", "Window", "Element"] }
 
 # [profile.dev]
 # debug = false
 # opt-level = 2
 
-# [features]
-# default = []
-# wasm_support = []
-# x86_support = []
+[features]
+default = ["logging"]
+keyboard_controls = []
+logging = []
 
 # [target.x86_64-pc-windows-gnu]
 # linker = "x86_64-w64-mingw32-gcc"
