@@ -103,7 +103,7 @@ where
     }
 }
 
-trait Foo {
+pub trait Foo {
     fn write_into_buffer(&self, buffer: &mut Vec<u8>, offset: usize);
     fn size(&self) -> NonZeroU64;
     fn increment(&mut self);
@@ -113,6 +113,8 @@ trait Foo {
 impl<T, I> Foo for IncrementableOtherUniform<T, I>
 where
     T: ShaderType + WriteInto,
+    T: Increment<I>,
+    I: Opposite<I>,
     
 {
     fn write_into_buffer(&self, buffer: &mut Vec<u8>, offset: usize) {
@@ -123,20 +125,20 @@ where
         self.other_uniform.value.value.size()
     }
     fn increment(&mut self) {
-        self.other_uniform.value = self.other_uniform.value.(&self.inc);
-        println!("new value: {:?}", self.value);
+        self.other_uniform.value.increment();
+        // println!("new value: {:?}", self.value);
     }
     fn decrement(&mut self) {
-        self.value = self.value.increment(&self.inc.opposite());
-        println!("new value: {:?}", self.value);
+        self.other_uniform.value.decrement();
+        // println!("new value: {:?}", self.value);
     }
 }
 
-pub struct OtherUniforms<const N: usize> {
+pub struct IncrementableOtherUniforms<const N: usize> {
     pub other_uniforms: [Box<dyn Foo>; N],
 }
 
-impl<const N: usize> OtherUniforms<N> {
+impl<const N: usize> IncrementableOtherUniforms<N> {
     pub fn new(other_uniforms: [Box<dyn Foo>; N]) -> Self {
         Self { other_uniforms }
     }
@@ -156,13 +158,13 @@ impl<const N: usize> OtherUniforms<N> {
     }
 }
 
-pub struct OtherUniformsKeyController {
+pub struct IncrementableOtherUniformsControllerKeyboard {
     pub positive_modifier_key_code: KeyCode,
     pub negative_modifier_key_code: KeyCode,
     pub modifier_number_pressed: Option<usize>,
 }
 
-impl OtherUniformsKeyController {
+impl IncrementableOtherUniformsControllerKeyboard {
     pub fn new(
         positive_modifier_key_code: KeyCode,
         negative_modifier_key_code: KeyCode,
@@ -173,7 +175,7 @@ impl OtherUniformsKeyController {
             modifier_number_pressed: None,
         }
     }
-    pub fn process_event<const N: usize>(&mut self, event: &WindowEvent, other_uniforms: &mut OtherUniforms<N>) -> bool {
+    pub fn process_event<const N: usize>(&mut self, event: &WindowEvent, other_uniforms: &mut IncrementableOtherUniforms<N>) -> bool {
         match event {
             WindowEvent::KeyboardInput {
                 event:
@@ -209,7 +211,7 @@ impl OtherUniformsKeyController {
                             return true;
                         }
                         if *code == self.negative_modifier_key_code {
-                            other_uniforms[modifier_number].inc_value.decrement();
+                            other_uniforms.other_uniforms[modifier_number].decrement();
                             return true;
                         }
                     }
@@ -224,84 +226,84 @@ impl OtherUniformsKeyController {
 
 // mental gymnastics ends
 
-pub struct OtherUniformsK<const N: usize> {
-    pub positive_modifier_key_code: KeyCode,
-    pub negative_modifier_key_code: KeyCode,
-    pub other_uniforms: [OtherUniform; N],
-    pub modifier_number_pressed: Option<usize>,
-}
+// pub struct OtherUniformsK<const N: usize> {
+//     pub positive_modifier_key_code: KeyCode,
+//     pub negative_modifier_key_code: KeyCode,
+//     pub other_uniforms: [OtherUniform; N],
+//     pub modifier_number_pressed: Option<usize>,
+// }
 
-impl<const N: usize> OtherUniformsK<N> {
-    pub fn new(
-        positive_modifier_key_code: KeyCode,
-        negative_modifier_key_code: KeyCode,
-        other_uniforms: [OtherUniform; N],
-    ) -> Self {
-        Self {
-            positive_modifier_key_code,
-            negative_modifier_key_code,
-            other_uniforms,
-            modifier_number_pressed: None,
-        }
-    }
-    pub fn uniform_buffer_content(&self) -> Vec<u8> {
-        let mut buffer: Vec<u8> = Vec::new();
-        let mut pos = 0;
-        for other_uniform in &self.other_uniforms {
-            {
-                other_uniform.inc_value.write_into_buffer(&mut buffer, pos);
-                pos += other_uniform.inc_value.size().get() as usize;
-            }
-        }
-        for _i in buffer.len()..((buffer.len() as f32 / 16.0).ceil() * 16.0) as usize {
-            buffer.push(0u8);
-        }
-        buffer
-    }
-    pub fn process_event(&mut self, event: &WindowEvent) -> bool {
-        match event {
-            WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        physical_key: PhysicalKey::Code(code),
-                        state,
-                        ..
-                    },
-                ..
-            } => {
-                let is_pressed = match state {
-                    ElementState::Pressed => true,
-                    ElementState::Released => false,
-                };
-                if !is_pressed {
-                    return false;
-                }
-                if let Some(number) = number_from_virtual_key_code(code) {
-                    self.modifier_number_pressed = Some(number);
-                    println!(
-                        "{}",
-                        match self.other_uniforms.get(number) {
-                            Some(other_uniform) => format!("{} selected", other_uniform.label),
-                            None => "nothing selected".into(),
-                        }
-                    );
-                    return true;
-                }
-                if let Some(modifier_number) = self.modifier_number_pressed {
-                    if modifier_number < N {
-                        if *code == self.positive_modifier_key_code {
-                            self.other_uniforms[modifier_number].inc_value.increment();
-                            return true;
-                        }
-                        if *code == self.negative_modifier_key_code {
-                            self.other_uniforms[modifier_number].inc_value.decrement();
-                            return true;
-                        }
-                    }
-                }
-                false
-            }
-            _ => false,
-        }
-    }
-}
+// impl<const N: usize> OtherUniformsK<N> {
+//     pub fn new(
+//         positive_modifier_key_code: KeyCode,
+//         negative_modifier_key_code: KeyCode,
+//         other_uniforms: [OtherUniform; N],
+//     ) -> Self {
+//         Self {
+//             positive_modifier_key_code,
+//             negative_modifier_key_code,
+//             other_uniforms,
+//             modifier_number_pressed: None,
+//         }
+//     }
+//     pub fn uniform_buffer_content(&self) -> Vec<u8> {
+//         let mut buffer: Vec<u8> = Vec::new();
+//         let mut pos = 0;
+//         for other_uniform in &self.other_uniforms {
+//             {
+//                 other_uniform.inc_value.write_into_buffer(&mut buffer, pos);
+//                 pos += other_uniform.inc_value.size().get() as usize;
+//             }
+//         }
+//         for _i in buffer.len()..((buffer.len() as f32 / 16.0).ceil() * 16.0) as usize {
+//             buffer.push(0u8);
+//         }
+//         buffer
+//     }
+//     pub fn process_event(&mut self, event: &WindowEvent) -> bool {
+//         match event {
+//             WindowEvent::KeyboardInput {
+//                 event:
+//                     KeyEvent {
+//                         physical_key: PhysicalKey::Code(code),
+//                         state,
+//                         ..
+//                     },
+//                 ..
+//             } => {
+//                 let is_pressed = match state {
+//                     ElementState::Pressed => true,
+//                     ElementState::Released => false,
+//                 };
+//                 if !is_pressed {
+//                     return false;
+//                 }
+//                 if let Some(number) = number_from_virtual_key_code(code) {
+//                     self.modifier_number_pressed = Some(number);
+//                     println!(
+//                         "{}",
+//                         match self.other_uniforms.get(number) {
+//                             Some(other_uniform) => format!("{} selected", other_uniform.label),
+//                             None => "nothing selected".into(),
+//                         }
+//                     );
+//                     return true;
+//                 }
+//                 if let Some(modifier_number) = self.modifier_number_pressed {
+//                     if modifier_number < N {
+//                         if *code == self.positive_modifier_key_code {
+//                             self.other_uniforms[modifier_number].inc_value.increment();
+//                             return true;
+//                         }
+//                         if *code == self.negative_modifier_key_code {
+//                             self.other_uniforms[modifier_number].inc_value.decrement();
+//                             return true;
+//                         }
+//                     }
+//                 }
+//                 false
+//             }
+//             _ => false,
+//         }
+//     }
+// }

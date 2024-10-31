@@ -1,7 +1,10 @@
 use crate::{
     camera::{Camera, CameraController},
     indices::INDICES,
-    otheruniforms::{BufferContent, IncValue, OtherUniform, OtherUniformsK},
+    otheruniforms::{
+        BufferContent, IncValue, IncrementableOtherUniform, IncrementableOtherUniforms,
+        IncrementableOtherUniformsControllerKeyboard, OtherUniform,
+    },
     podbool::PodBool,
     texture::Texture,
     uniforms::{BlackHole, BlackHolesUniform, CameraUniform},
@@ -32,7 +35,8 @@ pub struct Scene {
     pub camera_uniform: CameraUniform,
     pub camera_uniform_buffer: wgpu::Buffer,
 
-    pub other_uniforms: OtherUniformsK<9>,
+    pub other_uniforms: IncrementableOtherUniforms<9>,
+    pub other_uniforms_controller_keyboard: IncrementableOtherUniformsControllerKeyboard,
     pub other_uniforms_buffer: wgpu::Buffer,
 
     pub black_holes_uniform: BlackHolesUniform<10>,
@@ -73,75 +77,92 @@ impl Scene {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let other_uniforms = OtherUniformsK::new(
-            KeyCode::PageUp,
-            KeyCode::PageDown,
-            [
-                OtherUniform {
+        let other_uniforms = IncrementableOtherUniforms::new([
+            Box::new(IncrementableOtherUniform {
+                other_uniform: OtherUniform {
                     label: "dist_to_surfaces_mult".into(),
-                    inc_value: Box::new(IncValue {
+                    value: IncValue {
                         value: 0.6,
                         inc: 0.05,
-                    }),
+                    },
                 },
-                OtherUniform {
+            }),
+            Box::new(IncrementableOtherUniform {
+                other_uniform: OtherUniform {
                     label: "dist_to_singularity_squared_mult".into(),
-                    inc_value: Box::new(IncValue {
+                    value: IncValue {
                         value: 0.04,
                         inc: 0.004,
-                    }),
+                    },
                 },
-                OtherUniform {
-                    label: "blackout event horizon".into(),
-                    inc_value: Box::new(IncValue {
+            }),
+            Box::new(IncrementableOtherUniform {
+                other_uniform: OtherUniform {
+                    label: "blackout_event_horizon".into(),
+                    value: IncValue {
                         value: PodBool::r#true(),
                         inc: PodBool::r#true(),
-                    }),
+                    },
                 },
-                OtherUniform {
+            }),
+            Box::new(IncrementableOtherUniform {
+                other_uniform: OtherUniform {
                     label: "min_dist".into(),
-                    inc_value: Box::new(IncValue {
+                    value: IncValue {
                         value: 0.001,
                         inc: 0.0001,
-                    }),
+                    },
                 },
-                OtherUniform {
+            }),
+            Box::new(IncrementableOtherUniform {
+                other_uniform: OtherUniform {
                     label: "max_dist".into(),
-                    inc_value: Box::new(IncValue {
+                    value: IncValue {
                         value: 250.0,
                         inc: 5.0,
-                    }),
+                    },
                 },
-                OtherUniform {
+            }),
+            Box::new(IncrementableOtherUniform {
+                other_uniform: OtherUniform {
                     label: "distortion_power".into(),
-                    inc_value: Box::new(IncValue {
+                    value: IncValue {
                         value: 1.0,
                         inc: 0.1,
-                    }),
+                    },
                 },
-                OtherUniform {
+            }),
+            Box::new(IncrementableOtherUniform {
+                other_uniform: OtherUniform {
                     label: "debug_colours".into(),
-                    inc_value: Box::new(IncValue {
+                    value: IncValue {
                         value: PodBool::r#false(),
                         inc: PodBool::r#true(),
-                    }),
+                    },
                 },
-                OtherUniform {
+            }),
+            Box::new(IncrementableOtherUniform {
+                other_uniform: OtherUniform {
                     label: "blackout_requires_ray_towards_black_hole".into(),
-                    inc_value: Box::new(IncValue {
+                    value: IncValue {
                         value: PodBool::r#false(),
                         inc: PodBool::r#true(),
-                    }),
+                    },
                 },
-                OtherUniform {
+            }),
+            Box::new(IncrementableOtherUniform {
+                other_uniform: OtherUniform {
                     label: "photon_sphere".into(),
-                    inc_value: Box::new(IncValue {
+                    value: IncValue {
                         value: PodBool::r#false(),
                         inc: PodBool::r#true(),
-                    }),
+                    },
                 },
-            ],
-        );
+            }),
+        ]);
+
+        let other_uniforms_controller_keyboard =
+            IncrementableOtherUniformsControllerKeyboard::new(KeyCode::PageUp, KeyCode::PageDown);
 
         let other_uniforms_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("other_uniforms_buffer"),
@@ -339,6 +360,7 @@ impl Scene {
             camera_uniform_buffer,
 
             other_uniforms,
+            other_uniforms_controller_keyboard,
             other_uniforms_buffer,
 
             black_holes_uniform,
@@ -372,7 +394,9 @@ impl Scene {
     }
 
     pub fn process_event(&mut self, event: &WindowEvent, queue: &wgpu::Queue) -> bool {
-        let other_uniforms_event_result = self.other_uniforms.process_event(event);
+        let other_uniforms_event_result = self
+            .other_uniforms_controller_keyboard
+            .process_event(event, &mut self.other_uniforms);
         if other_uniforms_event_result {
             queue.write_buffer(
                 &self.other_uniforms_buffer,
