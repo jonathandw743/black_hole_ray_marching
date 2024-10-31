@@ -4,8 +4,8 @@ use crate::{
     otheruniforms::{
         BufferContent, IncValue, IncrementableOtherUniform, IncrementableOtherUniforms,
         IncrementableOtherUniformsControllerKeyboard, OtherUniform,
+        PodBool
     },
-    podbool::PodBool,
     texture::Texture,
     uniforms::{BlackHole, BlackHolesUniform, CameraUniform},
     vertex::Vertex,

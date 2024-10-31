@@ -278,87 +278,86 @@ impl Increment<Self> for i32 {
     }
 }
 
+#[derive(Copy, Clone, ShaderType, Debug)]
+pub struct PodBool {
+    inner: u32,
+}
 
-// mental gymnastics ends
+impl PartialEq for PodBool {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+    fn ne(&self, other: &Self) -> bool {
+        self.inner != other.inner
+    }
+}
 
-// pub struct OtherUniformsK<const N: usize> {
-//     pub positive_modifier_key_code: KeyCode,
-//     pub negative_modifier_key_code: KeyCode,
-//     pub other_uniforms: [OtherUniform; N],
-//     pub modifier_number_pressed: Option<usize>,
-// }
+impl PodBool {
+    pub fn r#true() -> Self {
+        Self { inner: 0 }
+    }
+    pub fn r#false() -> Self {
+        Self { inner: 1 }
+    }
+    pub fn set(&mut self, value: bool) {
+        if value {
+            self.inner = 1;
+        } else {
+            self.inner = 0;
+        }
+    }
+    pub fn get(&self) -> bool {
+        if self.inner == 0 {
+            false
+        } else {
+            true
+        }
+    }
+}
 
-// impl<const N: usize> OtherUniformsK<N> {
-//     pub fn new(
-//         positive_modifier_key_code: KeyCode,
-//         negative_modifier_key_code: KeyCode,
-//         other_uniforms: [OtherUniform; N],
-//     ) -> Self {
-//         Self {
-//             positive_modifier_key_code,
-//             negative_modifier_key_code,
-//             other_uniforms,
-//             modifier_number_pressed: None,
-//         }
-//     }
-//     pub fn uniform_buffer_content(&self) -> Vec<u8> {
-//         let mut buffer: Vec<u8> = Vec::new();
-//         let mut pos = 0;
-//         for other_uniform in &self.other_uniforms {
-//             {
-//                 other_uniform.inc_value.write_into_buffer(&mut buffer, pos);
-//                 pos += other_uniform.inc_value.size().get() as usize;
-//             }
-//         }
-//         for _i in buffer.len()..((buffer.len() as f32 / 16.0).ceil() * 16.0) as usize {
-//             buffer.push(0u8);
-//         }
-//         buffer
-//     }
-//     pub fn process_event(&mut self, event: &WindowEvent) -> bool {
-//         match event {
-//             WindowEvent::KeyboardInput {
-//                 event:
-//                     KeyEvent {
-//                         physical_key: PhysicalKey::Code(code),
-//                         state,
-//                         ..
-//                     },
-//                 ..
-//             } => {
-//                 let is_pressed = match state {
-//                     ElementState::Pressed => true,
-//                     ElementState::Released => false,
-//                 };
-//                 if !is_pressed {
-//                     return false;
-//                 }
-//                 if let Some(number) = number_from_virtual_key_code(code) {
-//                     self.modifier_number_pressed = Some(number);
-//                     println!(
-//                         "{}",
-//                         match self.other_uniforms.get(number) {
-//                             Some(other_uniform) => format!("{} selected", other_uniform.label),
-//                             None => "nothing selected".into(),
-//                         }
-//                     );
-//                     return true;
-//                 }
-//                 if let Some(modifier_number) = self.modifier_number_pressed {
-//                     if modifier_number < N {
-//                         if *code == self.positive_modifier_key_code {
-//                             self.other_uniforms[modifier_number].inc_value.increment();
-//                             return true;
-//                         }
-//                         if *code == self.negative_modifier_key_code {
-//                             self.other_uniforms[modifier_number].inc_value.decrement();
-//                             return true;
-//                         }
-//                     }
-//                 }
-//                 false
-//             }
-//             _ => false,
-//         }
-//     }
-// }
+impl From<bool> for PodBool {
+    fn from(value: bool) -> Self {
+        if value {
+            PodBool::r#true()
+        } else {
+            PodBool::r#false()
+        }
+    }
+}
+
+impl From<PodBool> for bool {
+    fn from(value: PodBool) -> Self {
+        if value.inner == 0 {
+            false
+        } else {
+            true
+        }
+    }
+}
+
+impl std::fmt::Display for PodBool {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.get())
+    }
+}
+
+impl Increment<PodBool> for PodBool {
+    fn increment(&self, other: &PodBool) -> Self {
+        (self.get() ^ other.get()).into()
+    }
+}
+
+impl Increment<bool> for PodBool {
+    fn increment(&self, other: &bool) -> Self {
+        (self.get() ^ other).into()
+    }
+}
+
+impl<T> Opposite<T> for PodBool
+where
+    T: From<PodBool>,
+{
+    fn opposite(&self) -> T {
+        self.to_owned().into()
+    }
+}
