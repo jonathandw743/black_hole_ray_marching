@@ -1,6 +1,5 @@
 use std::{fmt::Debug, num::NonZeroU64};
 
-use crate::uniformscontroller::{Increment, Opposite};
 use egui::{Response, Ui};
 use encase::{
     internal::{WriteInto, Writer},
@@ -13,7 +12,6 @@ use winit::{
 
 use crate::settings::number_from_virtual_key_code;
 
-// mental gymnastics begins
 
 pub trait BufferContent {
     fn storage_buffer_content(&self) -> Vec<u8>;
@@ -220,6 +218,63 @@ impl IncrementableOtherUniformsControllerKeyboard {
             }
             _ => false,
         }
+    }
+}
+
+pub trait Opposite<T> {
+    fn opposite(&self) -> T;
+}
+
+pub trait Increment<T> {
+    fn increment(&self, other: &T) -> Self;
+    // fn decrement(&self, other: Self) -> Self;
+}
+
+impl Opposite<Self> for f32 {
+    fn opposite(&self) -> Self {
+        -self
+    }
+}
+
+impl Increment<Self> for f32 {
+    fn increment(&self, other: &Self) -> Self {
+        self + other
+    }
+}
+
+impl Opposite<Self> for bool {
+    fn opposite(&self) -> Self {
+        self.to_owned()
+    }
+}
+
+impl Increment<Self> for bool {
+    fn increment(&self, other: &Self) -> Self {
+        self ^ other
+    }
+}
+
+impl Opposite<i32> for usize {
+    fn opposite(&self) -> i32 {
+        -(*self as i32)
+    }
+}
+
+impl Increment<i32> for usize {
+    fn increment(&self, other: &i32) -> Self {
+        ((*self as i32) + other) as usize
+    }
+}
+
+impl Opposite<Self> for i32 {
+    fn opposite(&self) -> Self {
+        -self
+    }
+}
+
+impl Increment<Self> for i32 {
+    fn increment(&self, other: &Self) -> Self {
+        self + other
     }
 }
 
