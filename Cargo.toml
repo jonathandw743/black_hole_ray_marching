@@ -24,8 +24,15 @@ glam = "0.24.2"
 cfg-if = "1.0.0"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
-egui = "0.29.1"
-egui-winit = "0.29.1"
+egui = { version = "0.29.1", features = ["document-features"] }
+egui-winit = { version = "0.29.1", default-features=false, features = [#"arboard",
+             "bytemuck",
+            #  + clipboard
+             "links",
+            #  smithay-clipboard
+             "wayland",
+             "webbrowser",
+             "x11","document-features"] }
 egui-wgpu = { version = "0.29.1", features = ["wayland", "winit"] }
 
 [dependencies.image]

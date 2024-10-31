@@ -1,7 +1,7 @@
 use crate::{
     camera::{Camera, CameraController},
     indices::INDICES,
-    otheruniforms::{BufferContent, IncValue, OtherUniform, OtherUniforms},
+    otheruniforms::{BufferContent, IncValue, OtherUniform, OtherUniformsK},
     podbool::PodBool,
     texture::Texture,
     uniforms::{BlackHole, BlackHolesUniform, CameraUniform},
@@ -32,7 +32,7 @@ pub struct Scene {
     pub camera_uniform: CameraUniform,
     pub camera_uniform_buffer: wgpu::Buffer,
 
-    pub other_uniforms: OtherUniforms<9>,
+    pub other_uniforms: OtherUniformsK<9>,
     pub other_uniforms_buffer: wgpu::Buffer,
 
     pub black_holes_uniform: BlackHolesUniform<10>,
@@ -73,7 +73,7 @@ impl Scene {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let other_uniforms = OtherUniforms::new(
+        let other_uniforms = OtherUniformsK::new(
             KeyCode::PageUp,
             KeyCode::PageDown,
             [

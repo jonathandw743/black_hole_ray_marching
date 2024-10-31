@@ -1,11 +1,15 @@
 use std::{fmt::Debug, num::NonZeroU64};
 
 use crate::uniformscontroller::{Increment, Opposite};
+use egui::{Response, Ui};
 use encase::{
     internal::{WriteInto, Writer},
     ShaderType,
 };
-use winit::{event::{ElementState, KeyEvent, WindowEvent}, keyboard::{KeyCode, PhysicalKey}};
+use winit::{
+    event::{ElementState, KeyEvent, WindowEvent},
+    keyboard::{KeyCode, PhysicalKey},
+};
 
 use crate::settings::number_from_virtual_key_code;
 
@@ -33,63 +37,114 @@ where
     }
 }
 
-pub struct OtherUniform {
+pub struct OtherUniform<T> {
     pub label: String,
-    pub inc_value: Box<dyn IncValueTrait>,
+    pub value: T,
 }
 
-#[derive(Debug)]
-pub struct IncValue<T, I>
+impl<T> WriteInto for OtherUniform<T>
 where
-    T: Increment<I>,
-    I: Opposite<I>,
-    T: ShaderType + WriteInto,
+    T: WriteInto,
 {
+    fn write_into<B>(&self, writer: &mut Writer<B>)
+    where
+        B: encase::internal::BufferMut,
+    {
+        self.value.write_into(writer);
+    }
+}
+
+// #[derive(Debug)]
+pub struct IncValue<T, I> {
     pub value: T,
     pub inc: I,
 }
 
-pub trait IncValueTrait: Debug {
-    fn increment(&mut self);
-    fn decrement(&mut self);
-    // could change this into a more generic UniformBuffer thing like encase does
-    fn write_into_buffer(&self, buffer: &mut Vec<u8>, offset: usize);
-    fn size(&self) -> NonZeroU64;
+impl<T, I> WriteInto for IncValue<T, I>
+where
+    T: WriteInto,
+{
+    fn write_into<B>(&self, writer: &mut Writer<B>)
+    where
+        B: encase::internal::BufferMut,
+    {
+        self.value.write_into(writer);
+    }
 }
 
-impl<T, I> IncValueTrait for IncValue<T, I>
+impl<T, I> IncValue<T, I>
 where
-    T: Increment<I> + Debug,
-    I: Opposite<I> + Debug,
-    T: ShaderType + WriteInto,
+    T: Increment<I>,
+    I: Opposite<I>,
 {
     fn increment(&mut self) {
         self.value = self.value.increment(&self.inc);
-        println!("new value: {:?}", self.value);
+        // println!("new value: {:?}", self.value);
     }
     fn decrement(&mut self) {
         self.value = self.value.increment(&self.inc.opposite());
-        println!("new value: {:?}", self.value);
+        // println!("new value: {:?}", self.value);
     }
-    fn write_into_buffer(&self, buffer: &mut Vec<u8>, offset: usize) {
-        let mut writer = Writer::new(&self.value, buffer, offset).unwrap();
-        self.value.write_into(&mut writer);
+}
+
+pub struct IncrementableOtherUniform<T, I>
+{
+    pub other_uniform: OtherUniform<IncValue<T, I>>,
+}
+
+impl<T, I> WriteInto for IncrementableOtherUniform<T, I>
+where
+    T: WriteInto,
+{
+    fn write_into<B>(&self, writer: &mut Writer<B>)
+    where
+        B: encase::internal::BufferMut,
+    {
+        self.other_uniform.write_into(writer);
     }
-    fn size(&self) -> NonZeroU64 {
-        self.value.size()
+}
+
+trait Foo {
+}
+
+pub struct OtherUniforms<const N: usize> {
+    pub other_uniforms: [Box<dyn Foo>; N],
+}
+
+impl<const N: usize> OtherUniforms<N> {
+    pub fn new(
+        other_uniforms: [Box<dyn WriteInto>; N],
+    ) -> Self {
+        Self {
+            other_uniforms,
+        }
+    }
+    pub fn uniform_buffer_content(&self) -> Vec<u8> {
+        let mut buffer: Vec<u8> = Vec::new();
+        let mut pos = 0;
+        for other_uniform in &self.other_uniforms {
+            {
+                other_uniform.inc_value.write_into_buffer(&mut buffer, pos);
+                pos += other_uniform.inc_value.size().get() as usize;
+            }
+        }
+        for _i in buffer.len()..((buffer.len() as f32 / 16.0).ceil() * 16.0) as usize {
+            buffer.push(0u8);
+        }
+        buffer
     }
 }
 
 // mental gymnastics ends
 
-pub struct OtherUniforms<const N: usize> {
+pub struct OtherUniformsK<const N: usize> {
     pub positive_modifier_key_code: KeyCode,
     pub negative_modifier_key_code: KeyCode,
     pub other_uniforms: [OtherUniform; N],
     pub modifier_number_pressed: Option<usize>,
 }
 
-impl<const N: usize> OtherUniforms<N> {
+impl<const N: usize> OtherUniformsK<N> {
     pub fn new(
         positive_modifier_key_code: KeyCode,
         negative_modifier_key_code: KeyCode,

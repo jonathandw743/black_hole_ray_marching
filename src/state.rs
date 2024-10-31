@@ -319,7 +319,7 @@ impl State<'_> {
             None,
         );
 
-        self.copy.pass(&mut encoder, 1280, 720);
+        // self.copy.pass(&mut encoder, 1280, 720);
 
         if self.gui_enabled {
             self.gui.render(

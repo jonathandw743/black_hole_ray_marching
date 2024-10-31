@@ -1,8 +1,22 @@
 use std::sync::Arc;
 
+use egui::{Response, Ui};
 use egui_wgpu::ScreenDescriptor;
 use wgpu::{CommandEncoder, SurfaceConfiguration};
 use winit::{event::WindowEvent, window::Window};
+
+use crate::otheruniforms::{OtherUniform, OtherUniformsK};
+
+pub trait CreateUi {
+    fn create_ui(&mut self, ui: Ui) -> Response;
+}
+
+impl CreateUi for OtherUniform {
+    fn create_ui(&mut self, ui: Ui) -> Response {
+        
+    }
+}
+
 
 pub struct Gui {
     pub window: Arc<Window>,
@@ -56,6 +70,7 @@ impl Gui {
         queue: &wgpu::Queue,
         output_view: &wgpu::TextureView,
         config: &SurfaceConfiguration,
+        &mut other_uniforms: OtherUniformsK,
     ) {
         let screen_descriptor = Self::screen_descriptor(config);
         let raw_input = self.egui_state.take_egui_input(&self.window);
@@ -66,7 +81,8 @@ impl Gui {
                 if ui.button("Click me").clicked() {
                     println!("Button was clicked!");
                 }
-                ui.label("Hello, egui!");
+                ui.checkbox(&mut x, "hello");
+                ui.label("Hello, egui!")
             });
         });
         self.egui_state
