@@ -27,10 +27,10 @@
 <!-- <body id="wasm-target"> -->
 <body>
     <script type="module">
-        import initWebgpu from "./pkg-webgpu/black_hole_ray_marching.js";
-        import initWebgl from "./pkg-webgl/black_hole_ray_marching.js";
-        // import initWebgpu from "./pkg-webgpu-dev/black_hole_ray_marching.js";
-        // import initWebgl from "./pkg-webgl-dev/black_hole_ray_marching.js";
+        // import initWebgpu from "./pkg-webgpu/black_hole_ray_marching.js";
+        // import initWebgl from "./pkg-webgl/black_hole_ray_marching.js";
+        import initWebgpu from "./pkg-webgpu-dev/black_hole_ray_marching.js";
+        import initWebgl from "./pkg-webgl-dev/black_hole_ray_marching.js";
         document.getElementById("webgpu-button").onclick = () => {
             document.getElementById("wasm-target").innerHTML = "";
             // setTimeout(() => {
