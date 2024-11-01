@@ -33,15 +33,15 @@
         // import initWebgl from "./pkg-webgl-dev/black_hole_ray_marching.js";
         document.getElementById("webgpu-button").onclick = () => {
             document.getElementById("wasm-target").innerHTML = "";
-            setTimeout(() => {
+            // setTimeout(() => {
             initWebgpu().then(() => {console.log('WASM WebGPU Loaded');});
-            }, 2000);
+            // }, 2000);
         }
         document.getElementById("webgl-button").onclick = () => {
             document.getElementById("wasm-target").innerHTML = "";
-            setTimeout(() => {
+            // setTimeout(() => {
             initWebgl().then(() => {console.log('WASM WebGL Loaded');});
-            }, 2000);
+            // }, 2000);
         }
     </script>
     <button id="webgpu-button">webgpu</button>
