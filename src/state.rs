@@ -51,7 +51,7 @@ pub struct State<'a> {
     // pub copy: Copy,
     // pub blur: Blur,
     pub render_bloom: bool,
-    // pub bloom: Bloom,
+    pub bloom: Bloom,
     // pub downsampling: Downsampling<{ LEVELS }>,
     // pub upsampling: Upsampling<{ LEVELS }>,
 
@@ -137,7 +137,7 @@ impl State<'_> {
 
         surface.configure(&device, &config);
 
-        let scene = Scene::new(&device, &queue, &config, false);
+        let scene = Scene::new(&device, &queue, &config, true);
         // let source = device.create_texture(&wgpu::TextureDescriptor {
         //     label: Some("source"),
         //     mip_level_count: 1,
@@ -185,7 +185,7 @@ impl State<'_> {
         // let kawase_downsampling = KawaseDownsampling::new(&device, &config);
         // let kawase_upsampling = KawaseUpsampling::new(&device, &config);
 
-        // let bloom = Bloom::new(&device, &config, 3);
+        let bloom = Bloom::new(&device, &config, 3);
 
         let last_frame_time = Instant::now();
 
@@ -209,7 +209,7 @@ impl State<'_> {
             // copy,
 
             // blur,
-            render_bloom: false,
+            render_bloom: true,
             // bloom,
             // downsampling,
             // upsampling,
@@ -218,7 +218,7 @@ impl State<'_> {
 
             // kawase_upsampling,
             // kawase_downsampling,
-            //bloom,
+            bloom,
             start_of_last_frame_instant: last_frame_time,
             delta_time,
 
@@ -242,7 +242,7 @@ impl State<'_> {
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
             self.scene.resize(&self.device, &self.queue, &self.config);
-            // self.bloom.resize(&self.device, &self.config);
+            self.bloom.resize(&self.device, &self.config, &self.queue);
             // self.downsampling.resize(&self.device, &self.config);
             // self.downsampling.resize(&self.device, &self.config);
 
@@ -310,38 +310,38 @@ impl State<'_> {
                 label: Some("scene Render Encoder"),
             });
         
-        // if self.render_bloom {
+        if self.render_bloom {
             self.scene.render(
                 &mut encoder,
-                // Some(&self.bloom.full_image_input_texture_view()),
-                Some(&output_view),
-                // Some(&self.bloom.blackout_input_texture_view()),
-                None
+                Some(&self.bloom.full_image_input_texture_view()),
+                // Some(&output_view),
+                Some(&self.bloom.blackout_input_texture_view()),
+                // None
             );
-            // self.bloom.render(&mut encoder, Some(&output_view));
-        // } else {
-        //     self.scene.render(
-        //         &mut encoder,
-        //         Some(&output_view),
-        //         Some(&self.bloom.blackout_input_texture_view()),
-        //     );
-        // }
+            self.bloom.render(&mut encoder, Some(&output_view));
+        } else {
+            self.scene.render(
+                &mut encoder,
+                Some(&output_view),
+                Some(&self.bloom.blackout_input_texture_view()),
+            );
+        }
 
-        // #[cfg(not(feature = "keyboard_controls"))]
-        // if self.gui_enabled {
-        //     self.gui.render(
-        //         &mut encoder,
-        //         &self.device,
-        //         &self.queue,
-        //         &output_view,
-        //         &self.config,
-        //         &mut self.scene.other_uniforms,
-        //         &self.scene.other_uniforms_buffer,
-        //         &mut self.scene.black_holes_profile,
-        //         &mut self.scene.black_holes_uniform,
-        //         &mut self.render_bloom,
-        //     );
-        // }
+        #[cfg(not(feature = "keyboard_controls"))]
+        if self.gui_enabled {
+            self.gui.render(
+                &mut encoder,
+                &self.device,
+                &self.queue,
+                &output_view,
+                &self.config,
+                &mut self.scene.other_uniforms,
+                &self.scene.other_uniforms_buffer,
+                &mut self.scene.black_holes_profile,
+                &mut self.scene.black_holes_uniform,
+                &mut self.render_bloom,
+            );
+        }
 
         // self.kawase_downsampling.render(&mut encoder, Some(self.kawase_upsampling.input_texture_view()));
         // self.kawase_upsampling.render(&mut encoder, Some(&output_view));

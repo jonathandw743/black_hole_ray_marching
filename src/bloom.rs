@@ -45,6 +45,9 @@ impl Bloom {
         for blur in &mut self.blurs {
             blur.resize(device, config, queue);
         }
+        for copy in &mut self.copies {
+            copy.resize(device, config);
+        }
         for remix in &mut self.remixes {
             remix.resize(device, config);
         }
@@ -56,10 +59,10 @@ impl Bloom {
         output_view: Option<&wgpu::TextureView>,
     ) {
         for level in 0..self.levels - 1 {
-            self.copies[0].render(encoder, Some(self.blurs[0].input_texture_view()));
-            self.copies[0].render(encoder, Some(self.remixes[0].input_texture_0_view()));
-            self.blurs[0].render(encoder, Some(self.remixes[0].input_texture_1_view()));
-            self.remixes[0].render(encoder, Some(self.copies[level + 1].input_texture_view()));
+            self.copies[level].render(encoder, Some(self.blurs[level].input_texture_view()));
+            self.copies[level].render(encoder, Some(self.remixes[level].input_texture_0_view()));
+            self.blurs[level].render(encoder, Some(self.remixes[level].input_texture_1_view()));
+            self.remixes[level].render(encoder, Some(self.copies[level + 1].input_texture_view()));
         }
 
         self.copies[self.levels - 1].render(
