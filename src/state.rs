@@ -46,11 +46,12 @@ pub struct State<'a> {
 
     pub scene: Scene,
 
-    pub source: Texture,
-    pub destination: Texture,
-    pub copy: Copy,
+    // pub source: Texture,
+    // pub destination: Texture,
+    // pub copy: Copy,
     // pub blur: Blur,
-    //pub bloom: Bloom,
+    pub render_bloom: bool,
+    pub bloom: Bloom,
     // pub downsampling: Downsampling<{ LEVELS }>,
     // pub upsampling: Upsampling<{ LEVELS }>,
 
@@ -136,41 +137,41 @@ impl State<'_> {
 
         surface.configure(&device, &config);
 
-        let scene = Scene::new(&device, &queue, &config, false);
-        let source = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("source"),
-            mip_level_count: 1,
-            size: wgpu::Extent3d {
-                width: 1280,
-                height: 270,
-                depth_or_array_layers: 1,
-            },
-            format: wgpu::TextureFormat::Rgba8Unorm, //config.format,
-            dimension: wgpu::TextureDimension::D2,
-            usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
-            sample_count: 1,
-            view_formats: &[],
-        });
-        let destination = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("destination"),
-            mip_level_count: 1,
-            size: wgpu::Extent3d {
-                width: 1280,
-                height: 270,
-                depth_or_array_layers: 1,
-            },
-            format: wgpu::TextureFormat::Rgba8Unorm, //config.format,
-            dimension: wgpu::TextureDimension::D2,
-            usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
-            sample_count: 1,
-            view_formats: &[],
-        });
-        let copy = Copy::new(
-            &device,
-            &config,
-            &source.create_view(&wgpu::TextureViewDescriptor::default()),
-            &destination.create_view(&wgpu::TextureViewDescriptor::default()),
-        );
+        let scene = Scene::new(&device, &queue, &config, true);
+        // let source = device.create_texture(&wgpu::TextureDescriptor {
+        //     label: Some("source"),
+        //     mip_level_count: 1,
+        //     size: wgpu::Extent3d {
+        //         width: 1280,
+        //         height: 270,
+        //         depth_or_array_layers: 1,
+        //     },
+        //     format: wgpu::TextureFormat::Rgba8Unorm, //config.format,
+        //     dimension: wgpu::TextureDimension::D2,
+        //     usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+        //     sample_count: 1,
+        //     view_formats: &[],
+        // });
+        // let destination = device.create_texture(&wgpu::TextureDescriptor {
+        //     label: Some("destination"),
+        //     mip_level_count: 1,
+        //     size: wgpu::Extent3d {
+        //         width: 1280,
+        //         height: 270,
+        //         depth_or_array_layers: 1,
+        //     },
+        //     format: wgpu::TextureFormat::Rgba8Unorm, //config.format,
+        //     dimension: wgpu::TextureDimension::D2,
+        //     usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+        //     sample_count: 1,
+        //     view_formats: &[],
+        // });
+        // let copy = Copy::new(
+        //     &device,
+        //     &config,
+        //     &source.create_view(&wgpu::TextureViewDescriptor::default()),
+        //     &destination.create_view(&wgpu::TextureViewDescriptor::default()),
+        // );
         // let blur = Blur::new(&device, &queue, &config, &scene.output_texture_view);
 
         // let bloom = Bloom::new(&device, &config);
@@ -203,12 +204,12 @@ impl State<'_> {
 
             scene,
 
-            source,
-            destination,
-            copy,
+            // source,
+            // destination,
+            // copy,
 
             // blur,
-            // bloom,
+            bloom,
             // downsampling,
             // upsampling,
 
@@ -229,6 +230,8 @@ impl State<'_> {
             gui,
 
             t0: Instant::now(),
+
+            render_bloom: true,
         })
     }
 
@@ -306,16 +309,21 @@ impl State<'_> {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("scene Render Encoder"),
             });
-
-        self.scene.render(
-            &mut encoder,
-            //Some(&self.bloom.full_image_input_texture_view()),
-            Some(&output_view),
-            //Some(&self.bloom.blackout_input_texture_view()),
-            None,
-        );
-
-        // self.copy.pass(&mut encoder, 1280, 720);
+        
+        if self.render_bloom {
+            self.scene.render(
+                &mut encoder,
+                Some(&self.bloom.full_image_input_texture_view()),
+                Some(&self.bloom.blackout_input_texture_view()),
+            );
+            self.bloom.render(&mut encoder, Some(&output_view));
+        } else {
+            self.scene.render(
+                &mut encoder,
+                Some(&output_view),
+                Some(&self.bloom.blackout_input_texture_view()),
+            );
+        }
 
         #[cfg(not(feature = "keyboard_controls"))]
         if self.gui_enabled {
@@ -329,6 +337,7 @@ impl State<'_> {
                 &self.scene.other_uniforms_buffer,
                 &mut self.scene.black_holes_profile,
                 &mut self.scene.black_holes_uniform,
+                &mut self.render_bloom,
             );
         }
 
@@ -337,7 +346,6 @@ impl State<'_> {
 
         // self.gaussian_blur.render(&mut encoder, Some(&output_view));
 
-        //self.bloom.render(&mut encoder, Some(&output_view));
 
         // self.downsampling
         // .render(&mut encoder, Some(self.upsampling.input_texture_view()));

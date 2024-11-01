@@ -39,7 +39,7 @@ mod kawase_downsampling;
 mod kawase_upsampling;
 // mod kawase_mixing_upsampling;
 
-//mod blur;
+mod blur;
 mod copy;
 mod remix;
 mod state;

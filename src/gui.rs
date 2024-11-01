@@ -77,12 +77,14 @@ impl Gui {
         other_uniforms_buffer: &wgpu::Buffer,
         black_holes_profile: &mut BlackHolesProfile,
         black_holes_uniform: &mut BlackHolesUniform<M>,
+        render_bloom: &mut bool,
     ) {
         let screen_descriptor = Self::screen_descriptor(config);
         let raw_input = self.egui_state.take_egui_input(&self.window);
         let full_output = self.egui_context.run(raw_input, |ctx| {
             egui::SidePanel::left("side_panel").show(ctx, |ui| {
                 ui.heading("Controls");
+                ui.checkbox(render_bloom, "Bloom");
                 ui.heading("Uniforms");
                 other_uniforms.ui(ui);
                 queue.write_buffer(
