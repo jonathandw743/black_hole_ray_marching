@@ -14,6 +14,7 @@ use winit::keyboard::{Key, KeyCode, PhysicalKey};
 use winit::window::Fullscreen;
 use winit::{event::*, window::Window};
 
+use crate::bloom::Bloom;
 use crate::copy::Copy;
 use crate::gui::Gui;
 //use crate::bloom::Bloom;
@@ -172,7 +173,7 @@ impl State<'_> {
         );
         // let blur = Blur::new(&device, &queue, &config, &scene.output_texture_view);
 
-        let bloom = Bloom::new(&device, &config);
+        // let bloom = Bloom::new(&device, &config);
 
         // let downsampling = Downsampling::new(&device, &config);
         // let upsampling = Upsampling::new(&device, &config, &downsampling.textures);
@@ -183,7 +184,7 @@ impl State<'_> {
         // let kawase_downsampling = KawaseDownsampling::new(&device, &config);
         // let kawase_upsampling = KawaseUpsampling::new(&device, &config);
 
-        //let bloom = Bloom::new(&device, &config, 3);
+        let bloom = Bloom::new(&device, &config, 3);
 
         let last_frame_time = Instant::now();
 
