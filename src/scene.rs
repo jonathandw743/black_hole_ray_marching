@@ -1,15 +1,9 @@
 use crate::{
-    camera::{Camera, CameraController},
-    indices::INDICES,
-    otheruniforms::{
+    black_holes_profile::{self, BlackHolesProfile}, camera::{Camera, CameraController}, indices::INDICES, otheruniforms::{
         self, BufferContent, GuiOtherUniform, GuiOtherUniforms, IncValue,
         IncrementableOtherUniform, IncrementableOtherUniforms,
         IncrementableOtherUniformsControllerKeyboard, OtherUniform, PodBool,
-    },
-    texture::Texture,
-    uniforms::{BlackHole, BlackHolesUniform, CameraUniform},
-    vertex::Vertex,
-    vertices::VERTICES,
+    }, texture::Texture, uniforms::{BlackHole, BlackHolesUniform, CameraUniform}, vertex::Vertex, vertices::VERTICES
 };
 
 use glam::{uvec2, vec2, vec3, vec4, UVec2, Vec2, Vec3, Vec4Swizzles};
@@ -37,7 +31,7 @@ pub struct Scene {
     pub camera_uniform_buffer: wgpu::Buffer,
 
     #[cfg(not(feature = "keyboard_controls"))]
-    pub other_uniforms: GuiOtherUniforms<9>,
+    pub other_uniforms: GuiOtherUniforms<13>,
     #[cfg(feature = "keyboard_controls")]
     pub other_uniforms: IncrementableOtherUniforms<9>,
     #[cfg(feature = "keyboard_controls")]
@@ -46,6 +40,7 @@ pub struct Scene {
 
     pub black_holes_uniform: BlackHolesUniform<10>,
     pub black_holes_uniform_buffer: wgpu::Buffer,
+    pub black_holes_profile: BlackHolesProfile,
 
     pub bind_group: wgpu::BindGroup,
 
@@ -100,16 +95,21 @@ impl Scene {
         #[rustfmt::skip]
         let other_uniforms = GuiOtherUniforms::new([
             Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "dist_to_surfaces_mult".into(), value: 0.6 }, 0.0, 1.0)),
-            Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "dist_to_singularity_squared_mult".into(), value: 0.04 }, 0.005, 0.1)),
+            Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "dist_to_singularity_power".into(), value: 2.0 }, 1.0, 10.0)),
+            Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "dist_to_singularity_mult".into(), value: 0.04 }, 0.0, 0.5)),
             Box::new(GuiOtherUniform::<PodBool>::new(OtherUniform { label: "blackout_event_horizon".into(), value: PodBool::r#true() })),
             Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "min_dist".into(), value: 0.001 }, 0.0001, 0.01)),
             Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "max_dist".into(), value: 250.0 }, 5.0, 500.0)),
-            Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "distortion_power".into(), value: 1.0 }, -2.0, 3.0)),
+            Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "distortion_power".into(), value: 1.0 }, 0.0, 1.0)),
             Box::new(GuiOtherUniform::<PodBool>::new(OtherUniform { label: "debug_colours".into(), value: PodBool::r#false() })),
             Box::new(GuiOtherUniform::<PodBool>::new(OtherUniform { label: "blackout_requires_ray_towards_black_hole".into(), value: PodBool::r#false() })),
             Box::new(GuiOtherUniform::<PodBool>::new(OtherUniform { label: "photon_sphere".into(), value: PodBool::r#false() })),
+            Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "fast_mode".into(), value: 0.0 }, 0.0, 1.0)),
+            Box::new(GuiOtherUniform::<PodBool>::new(OtherUniform { label: "render_accretion_disks".into(), value: PodBool::r#true() })),
+            Box::new(GuiOtherUniform::<PodBool>::new(OtherUniform { label: "render_markers".into(), value: PodBool::r#false() })),
         ]);
 
+        #[cfg(feature = "keyboard_controls")]
         let other_uniforms_controller_keyboard =
             IncrementableOtherUniformsControllerKeyboard::new(KeyCode::PageUp, KeyCode::PageDown);
         
@@ -118,19 +118,10 @@ impl Scene {
             contents: &other_uniforms.uniform_buffer_content(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
+        
+        let black_holes_profile = BlackHolesProfile::Orbiting;
 
-        let black_holes_uniform = BlackHolesUniform::new([
-            BlackHole {
-                pos: vec3(0.0, 0.0, 0.0),
-                rs: 1.0,
-                accretion_disk_size: 0.0,
-            },
-            BlackHole {
-                pos: vec3(3.0, 0.0, 0.0),
-                rs: 1.0,
-                accretion_disk_size: 0.0,
-            },
-        ]);
+        let black_holes_uniform = black_holes_profile.create_black_holes_uniform();
 
         let black_holes_uniform_buffer =
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -194,14 +185,11 @@ impl Scene {
             ],
         });
 
-        cfg_if! {
-            if #[cfg(target_arch = "wasm32")] {
-                // let space_bytes = include_bytes!("space_2048x1024.jpg");
-                let space_bytes = include_bytes!("space_4096x2048.jpg");
-            } else {
-                let space_bytes = include_bytes!("space_4096x2048.jpg");
-            }
-        }
+        #[cfg(target_arch = "wasm32")]
+        let space_bytes = include_bytes!("space_2048x1024.jpg");
+        #[cfg(not(target_arch = "wasm32"))]
+        let space_bytes = include_bytes!("space_4096x2048.jpg");
+
         let space_texture =
             Texture::from_bytes(&device, &queue, space_bytes, "space_texture").unwrap();
 
@@ -315,6 +303,7 @@ impl Scene {
 
             black_holes_uniform,
             black_holes_uniform_buffer,
+            black_holes_profile,
 
             bind_group,
 
@@ -358,7 +347,8 @@ impl Scene {
             }
         }
         [
-            // other_uniforms_event_result,
+            #[cfg(feature = "keyboard_controls")]
+            other_uniforms_event_result,
             self.camera_controller.process_event(event),
         ]
         .iter()
@@ -371,6 +361,7 @@ impl Scene {
         prev_cursor_position: Option<PhysicalPosition<f64>>,
         cursor_position: Option<PhysicalPosition<f64>>,
         queue: &wgpu::Queue,
+        t: Duration,
     ) {
         self.camera_controller.update_camera(
             &mut self.camera,
@@ -383,10 +374,12 @@ impl Scene {
             },
         );
 
+        self.black_holes_profile.update_black_holes_uniform(&mut self.black_holes_uniform, t);
+        queue.write_buffer(&self.black_holes_uniform_buffer, 0, &self.black_holes_uniform.uniform_buffer_content());
+
         self.camera_uniform.update(&self.camera);
 
-        let data = self.camera_uniform.uniform_buffer_content();
-        queue.write_buffer(&self.camera_uniform_buffer, 0, &data);
+        queue.write_buffer(&self.camera_uniform_buffer, 0, & self.camera_uniform.uniform_buffer_content());
     }
 
     pub fn render(

@@ -1,0 +1,1 @@
+wasm-pack build --target web --dev --out-dir pkg-webgpu-dev --features wgpu/webgpu

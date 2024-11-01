@@ -24,14 +24,29 @@
     </style>
 </head>
 
-<body id="wasm-example">
+<!-- <body id="wasm-target"> -->
+<body>
     <script type="module">
-        import init from "./pkg/black_hole_ray_marching.js";
-        init().then(() => {
-            console.log("WASM Loaded");
-        });
+        // import initWebgpu from "./pkg-webgpu/black_hole_ray_marching.js";
+        // import initWebgl from "./pkg-webgl/black_hole_ray_marching.js";
+        import initWebgpu from "./pkg-webgpu-dev/black_hole_ray_marching.js";
+        import initWebgl from "./pkg-webgl-dev/black_hole_ray_marching.js";
+        document.getElementById("webgpu-button").onclick = () => {
+            document.getElementById("wasm-target").innerHTML = "";
+            // setTimeout(() => {
+            initWebgpu().then(() => {console.log('WASM WebGPU Loaded');});
+            // }, 2000);
+        }
+        document.getElementById("webgl-button").onclick = () => {
+            document.getElementById("wasm-target").innerHTML = "";
+            // setTimeout(() => {
+            initWebgl().then(() => {console.log('WASM WebGL Loaded');});
+            // }, 2000);
+        }
     </script>
-    <!-- hello -->
+    <button id="webgpu-button">webgpu</button>
+    <button id="webgl-button">webgl</button>
+    <div id="wasm-target"></div>
 </body>
 
 </html>

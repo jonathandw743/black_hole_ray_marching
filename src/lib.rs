@@ -44,6 +44,7 @@ mod copy;
 mod remix;
 mod state;
 mod gui;
+mod black_holes_profile;
 
 enum UserEvent {
     ApplicationCreated(State<'static>),
@@ -78,7 +79,7 @@ impl ApplicationHandler<UserEvent> for ApplicationWindow {
             web_sys::window()
                 .and_then(|win| win.document())
                 .and_then(|doc| {
-                    let dst = doc.get_element_by_id("wasm-example")?;
+                    let dst = doc.get_element_by_id("wasm-target")?;
                     let canvas =
                         web_sys::Element::from(window.canvas().expect("couldn't retrieve canvas"));
                     dst.append_child(&canvas).ok()?;
@@ -152,6 +153,17 @@ impl ApplicationHandler<UserEvent> for ApplicationWindow {
             WindowEvent::CloseRequested => {
                 self.close_requested = true;
             }
+            // WindowEvent::KeyboardInput {
+            //     event:
+            //         KeyEvent {
+            //             physical_key: PhysicalKey::Code(KeyCode::Escape),
+            //             state: ElementState::Pressed,
+            //             ..
+            //         },
+            //     ..
+            // } => {
+            //     self.close_requested = true;
+            // }
             WindowEvent::KeyboardInput {
                 event:
                     KeyEvent {

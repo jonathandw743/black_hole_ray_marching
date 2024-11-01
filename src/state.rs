@@ -69,6 +69,8 @@ pub struct State<'a> {
 
     pub gui_enabled: bool,
     pub gui: Gui,
+
+    pub t0: Instant,
 }
 
 impl State<'_> {
@@ -90,18 +92,18 @@ impl State<'_> {
             .await
             .ok_or(anyhow!("Failed to find an appropriate adapter"))?;
 
-        let mut limits =
-            wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits());
-        limits.max_storage_textures_per_shader_stage = 2;
-        // limits.max_texture_dimension_1d = 10000;
-        // limits.max_texture_dimension_2d = 10000;
-        // limits.max_texture_dimension_3d = 1;
-        limits.max_compute_workgroup_size_x = 1;
-        limits.max_compute_workgroup_size_y = 1;
-        limits.max_compute_workgroup_size_z = 1;
-        limits.max_compute_invocations_per_workgroup = 1;
-        // limits.max_compute_workgroup_storage_size = 10000;
-        limits.max_compute_workgroups_per_dimension = 1280;
+        let limits =
+            wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits());
+        // limits.max_storage_textures_per_shader_stage = 2;
+        // // limits.max_texture_dimension_1d = 10000;
+        // // limits.max_texture_dimension_2d = 10000;
+        // // limits.max_texture_dimension_3d = 1;
+        // limits.max_compute_workgroup_size_x = 1;
+        // limits.max_compute_workgroup_size_y = 1;
+        // limits.max_compute_workgroup_size_z = 1;
+        // limits.max_compute_invocations_per_workgroup = 1;
+        // // limits.max_compute_workgroup_storage_size = 10000;
+        // limits.max_compute_workgroups_per_dimension = 1280;
 
         // Create the logical device and command queue
         let (device, queue) = adapter
@@ -170,7 +172,7 @@ impl State<'_> {
         );
         // let blur = Blur::new(&device, &queue, &config, &scene.output_texture_view);
 
-        // let bloom = Bloom::new(&device, &config);
+        let bloom = Bloom::new(&device, &config);
 
         // let downsampling = Downsampling::new(&device, &config);
         // let upsampling = Upsampling::new(&device, &config, &downsampling.textures);
@@ -224,6 +226,8 @@ impl State<'_> {
 
             gui_enabled: true,
             gui,
+
+            t0: Instant::now(),
         })
     }
 
@@ -271,18 +275,8 @@ impl State<'_> {
         }
     }
 
-    // pub fn input(&mut self, event: &WindowEvent) -> bool {
-    //     [
-    //         self.settings_controller.process_event(event),
-    //         self.scene.process_event(event, &self.queue),
-    //         self.process_event(event),
-    //     ]
-    //     .iter()
-    //     .any(|&result| result)
-    // }
-
     pub fn update(&mut self) {
-        // dbg!(self.prev_cursor_position, self.cursor_position);
+        let t = self.t0.elapsed();
         self.delta_time = self.start_of_last_frame_instant.elapsed();
         self.start_of_last_frame_instant += self.delta_time;
         // update controllers
@@ -292,6 +286,7 @@ impl State<'_> {
             self.prev_cursor_position,
             self.cursor_position,
             &self.queue,
+            t,
         );
         self.prev_cursor_position = self.cursor_position;
     }
@@ -331,6 +326,8 @@ impl State<'_> {
                 &self.config,
                 &mut self.scene.other_uniforms,
                 &self.scene.other_uniforms_buffer,
+                &mut self.scene.black_holes_profile,
+                &mut self.scene.black_holes_uniform,
             );
         }
 

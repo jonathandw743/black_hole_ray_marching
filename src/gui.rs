@@ -5,7 +5,11 @@ use egui_wgpu::ScreenDescriptor;
 use wgpu::{CommandEncoder, SurfaceConfiguration};
 use winit::{event::WindowEvent, window::Window};
 
-use crate::otheruniforms::{GuiOtherUniform, GuiOtherUniforms, OtherUniform};
+use crate::{
+    black_holes_profile::{self, BlackHolesProfile},
+    otheruniforms::{GuiOtherUniform, GuiOtherUniforms, OtherUniform},
+    uniforms::BlackHolesUniform,
+};
 
 // pub trait CreateUi {
 //     fn create_ui(&mut self, ui: Ui) -> Response;
@@ -62,7 +66,7 @@ impl Gui {
         }
     }
 
-    pub fn render<const N: usize>(
+    pub fn render<const N: usize, const M: usize>(
         &mut self,
         encoder: &mut CommandEncoder,
         device: &wgpu::Device,
@@ -71,11 +75,12 @@ impl Gui {
         config: &SurfaceConfiguration,
         other_uniforms: &mut GuiOtherUniforms<N>,
         other_uniforms_buffer: &wgpu::Buffer,
+        black_holes_profile: &mut BlackHolesProfile,
+        black_holes_uniform: &mut BlackHolesUniform<M>,
     ) {
         let screen_descriptor = Self::screen_descriptor(config);
         let raw_input = self.egui_state.take_egui_input(&self.window);
         let full_output = self.egui_context.run(raw_input, |ctx| {
-            // Create the side panel UI
             egui::SidePanel::left("side_panel").show(ctx, |ui| {
                 ui.heading("Controls");
                 ui.heading("Uniforms");
@@ -85,6 +90,28 @@ impl Gui {
                     0,
                     &other_uniforms.uniform_buffer_content(),
                 );
+                ui.heading("Black Holes Profiles");
+                if [
+                    ui.radio_value(black_holes_profile, BlackHolesProfile::Single, "Single"),
+                    ui.radio_value(black_holes_profile, BlackHolesProfile::Dual, "Dual"),
+                    ui.radio_value(black_holes_profile, BlackHolesProfile::Orbiting, "Orbiting"),
+                    ui.radio_value(black_holes_profile, BlackHolesProfile::Binary, "Binary"),
+                    ui.radio_value(
+                        black_holes_profile,
+                        BlackHolesProfile::BackAndForth,
+                        "Back and Forth",
+                    ),
+                ]
+                .iter()
+                .any(|response| response.clicked())
+                {
+                    let u: BlackHolesUniform<M> = black_holes_profile.create_black_holes_uniform();
+                    for i in 0..M {
+                        black_holes_uniform.black_holes[i] = u.black_holes[i];
+                        black_holes_uniform.count = u.count;
+                    }
+                }
+
                 ui.add_space(ui.available_height() - 20.0);
                 ui.label("Press Tab to Open/Close");
             });
