@@ -193,12 +193,19 @@ struct FragmentOutput {
     @location(1) blackout_col: vec4<f32>,
 }
 
-const ACCRETIONDISK_RETURN = vec3f(1.0, 1.0, 1.0);
-const BLACKOUT_RETURN = vec3f(0.0, 0.0, 0.0);
-const PHOTON_SPHERE_RETURN = vec3f(1.0, 1.0, 0.0);
-const SURFACE_RETURN = vec3f(1.0, 1.0, 1.0);
+// const ACCRETIONDISK_RETURN = vec3f(1.0, 1.0, 1.0);
+// const BLACKOUT_RETURN = vec3f(0.0, 0.0, 0.0);
+// const PHOTON_SPHERE_RETURN = vec3f(1.0, 1.0, 0.0);
+// const SURFACE_RETURN = vec3f(1.0, 1.0, 1.0);
 
-fn get_col(initial_photon: Photon) -> vec3f {
+const ACCRETIONDISK_RETURN = FragmentOutput(vec4f(1.0, 1.0, 1.0, 1.0), vec4f(1.0, 1.0, 1.0, 1.0));
+const BLACKOUT_RETURN = FragmentOutput(vec4f(0.0, 0.0, 0.0, 1.0), vec4f(0.0, 0.0, 0.0, 1.0));
+const PHOTON_SPHERE_RETURN = FragmentOutput(vec4f(1.0, 1.0, 0.0, 1.0), vec4f(1.0, 1.0, 0.0, 1.0));
+const SURFACE_RETURN = FragmentOutput(vec4f(1.0, 1.0, 1.0, 1.0), vec4f(0.0, 0.0, 0.0, 1.0));
+const DEBUG_RED = FragmentOutput(vec4f(1.0, 0.0, 0.0, 1.0), vec4f(0.0, 0.0, 0.0, 1.0));
+const DEBUG_GREEN = FragmentOutput(vec4f(0.0, 1.0, 0.0, 1.0), vec4f(0.0, 0.0, 0.0, 1.0));
+
+fn get_col(initial_photon: Photon) -> FragmentOutput {
     var photon = Photon(initial_photon.ro, initial_photon.rd);
 
     var h2s: array<f32, MAX_BLACK_HOLE_COUNT>;
@@ -314,13 +321,13 @@ fn get_col(initial_photon: Photon) -> vec3f {
         distance_travelled += delta_time;
         if distance_travelled > uniforms.max_dist {
             if u32_to_bool(uniforms.debug_colours) {
-                return vec3f(1.0, 0.0, 0.0);
+                return DEBUG_RED;
             }
             break;
         }
     }
     if u32_to_bool(uniforms.debug_colours) {
-        return vec3f(0.0, 1.0, 0.0);
+        return DEBUG_GREEN;
     }
     // any unit vector
     let normalized_final_rd = normalize(photon.rd);
@@ -334,19 +341,19 @@ fn get_col(initial_photon: Photon) -> vec3f {
     // 1 - y because in texture coords, +y is down
     let bg_col = textureSampleLevel(t_diffuse, s_diffuse, vec2<f32>(x, 1.0 - y), 0.0).xyz;
     let mapped_bg_col = map_bg_col(bg_col);
-    return mapped_bg_col;
-    // return FragmentOutput(vec4f(mapped_bg_col, 1.0), vec4f(0.0, 0.0, 0.0, 1.0));;
+    // return mapped_bg_col;
+    return FragmentOutput(vec4f(mapped_bg_col, 1.0), vec4f(0.0, 0.0, 0.0, 1.0));;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput {
     let ray_dir = normalize(in.camera_to_vertex);
     let photon = Photon(camera.pos.xyz, ray_dir);
-    // return get_col(photon);
-    let col = get_col(photon);
-    var blackout_col = col;
-    if dot(col, col) < 1.0 {
-        blackout_col = vec3f(0.0);
-    }
-    return FragmentOutput(vec4<f32>(col, 1.0), vec4<f32>(blackout_col, 1.0));
+    return get_col(photon);
+    // let col = get_col(photon);
+    // var blackout_col = col;
+    // if dot(col, col) < 1.0 {
+    //     blackout_col = vec3f(0.0);
+    // }
+    // return FragmentOutput(vec4<f32>(col, 1.0), vec4<f32>(blackout_col, 1.0));
 }

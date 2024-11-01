@@ -51,6 +51,7 @@ impl Bloom {
         for remix in &mut self.remixes {
             remix.resize(device, config);
         }
+        self.final_remix.resize(device, config);
     }
 
     pub fn render(
