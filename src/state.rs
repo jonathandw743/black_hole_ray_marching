@@ -51,7 +51,7 @@ pub struct State<'a> {
     // pub copy: Copy,
     // pub blur: Blur,
     pub render_bloom: bool,
-    pub bloom: Bloom,
+    // pub bloom: Bloom,
     // pub downsampling: Downsampling<{ LEVELS }>,
     // pub upsampling: Upsampling<{ LEVELS }>,
 
@@ -94,18 +94,18 @@ impl State<'_> {
             .await
             .ok_or(anyhow!("Failed to find an appropriate adapter"))?;
 
-        let limits =
-            wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits());
-        // limits.max_storage_textures_per_shader_stage = 2;
-        // // limits.max_texture_dimension_1d = 10000;
-        // // limits.max_texture_dimension_2d = 10000;
-        // // limits.max_texture_dimension_3d = 1;
-        // limits.max_compute_workgroup_size_x = 1;
-        // limits.max_compute_workgroup_size_y = 1;
-        // limits.max_compute_workgroup_size_z = 1;
-        // limits.max_compute_invocations_per_workgroup = 1;
-        // // limits.max_compute_workgroup_storage_size = 10000;
-        // limits.max_compute_workgroups_per_dimension = 1280;
+        let mut limits =
+            wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits());
+        limits.max_storage_textures_per_shader_stage = 2;
+        // limits.max_texture_dimension_1d = 10000;
+        // limits.max_texture_dimension_2d = 10000;
+        // limits.max_texture_dimension_3d = 1;
+        limits.max_compute_workgroup_size_x = 1;
+        limits.max_compute_workgroup_size_y = 1;
+        limits.max_compute_workgroup_size_z = 1;
+        limits.max_compute_invocations_per_workgroup = 1;
+        // limits.max_compute_workgroup_storage_size = 10000;
+        limits.max_compute_workgroups_per_dimension = 1280;
 
         // Create the logical device and command queue
         let (device, queue) = adapter
@@ -137,7 +137,7 @@ impl State<'_> {
 
         surface.configure(&device, &config);
 
-        let scene = Scene::new(&device, &queue, &config, true);
+        let scene = Scene::new(&device, &queue, &config, false);
         // let source = device.create_texture(&wgpu::TextureDescriptor {
         //     label: Some("source"),
         //     mip_level_count: 1,
@@ -185,7 +185,7 @@ impl State<'_> {
         // let kawase_downsampling = KawaseDownsampling::new(&device, &config);
         // let kawase_upsampling = KawaseUpsampling::new(&device, &config);
 
-        let bloom = Bloom::new(&device, &config, 3);
+        // let bloom = Bloom::new(&device, &config, 3);
 
         let last_frame_time = Instant::now();
 
@@ -209,7 +209,8 @@ impl State<'_> {
             // copy,
 
             // blur,
-            bloom,
+            render_bloom: false,
+            // bloom,
             // downsampling,
             // upsampling,
 
@@ -231,7 +232,6 @@ impl State<'_> {
 
             t0: Instant::now(),
 
-            render_bloom: true,
         })
     }
 
@@ -310,36 +310,38 @@ impl State<'_> {
                 label: Some("scene Render Encoder"),
             });
         
-        if self.render_bloom {
+        // if self.render_bloom {
             self.scene.render(
                 &mut encoder,
-                Some(&self.bloom.full_image_input_texture_view()),
-                Some(&self.bloom.blackout_input_texture_view()),
-            );
-            self.bloom.render(&mut encoder, Some(&output_view));
-        } else {
-            self.scene.render(
-                &mut encoder,
+                // Some(&self.bloom.full_image_input_texture_view()),
                 Some(&output_view),
-                Some(&self.bloom.blackout_input_texture_view()),
+                // Some(&self.bloom.blackout_input_texture_view()),
+                None
             );
-        }
+            // self.bloom.render(&mut encoder, Some(&output_view));
+        // } else {
+        //     self.scene.render(
+        //         &mut encoder,
+        //         Some(&output_view),
+        //         Some(&self.bloom.blackout_input_texture_view()),
+        //     );
+        // }
 
-        #[cfg(not(feature = "keyboard_controls"))]
-        if self.gui_enabled {
-            self.gui.render(
-                &mut encoder,
-                &self.device,
-                &self.queue,
-                &output_view,
-                &self.config,
-                &mut self.scene.other_uniforms,
-                &self.scene.other_uniforms_buffer,
-                &mut self.scene.black_holes_profile,
-                &mut self.scene.black_holes_uniform,
-                &mut self.render_bloom,
-            );
-        }
+        // #[cfg(not(feature = "keyboard_controls"))]
+        // if self.gui_enabled {
+        //     self.gui.render(
+        //         &mut encoder,
+        //         &self.device,
+        //         &self.queue,
+        //         &output_view,
+        //         &self.config,
+        //         &mut self.scene.other_uniforms,
+        //         &self.scene.other_uniforms_buffer,
+        //         &mut self.scene.black_holes_profile,
+        //         &mut self.scene.black_holes_uniform,
+        //         &mut self.render_bloom,
+        //     );
+        // }
 
         // self.kawase_downsampling.render(&mut encoder, Some(self.kawase_upsampling.input_texture_view()));
         // self.kawase_upsampling.render(&mut encoder, Some(&output_view));

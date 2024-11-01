@@ -193,7 +193,12 @@ struct FragmentOutput {
     @location(1) blackout_col: vec4<f32>,
 }
 
-fn get_col(initial_photon: Photon) -> FragmentOutput {
+const ACCRETIONDISK_RETURN = vec3f(1.0, 1.0, 1.0);
+const BLACKOUT_RETURN = vec3f(0.0, 0.0, 0.0);
+const PHOTON_SPHERE_RETURN = vec3f(1.0, 1.0, 0.0);
+const SURFACE_RETURN = vec3f(1.0, 1.0, 1.0);
+
+fn get_col(initial_photon: Photon) -> vec3f {
     var photon = Photon(initial_photon.ro, initial_photon.rd);
 
     var h2s: array<f32, MAX_BLACK_HOLE_COUNT>;
@@ -222,12 +227,12 @@ fn get_col(initial_photon: Photon) -> FragmentOutput {
 
         let dist_to_surfaces = sdf(photon.ro);
         if dist_to_surfaces < uniforms.min_dist {
-            return FragmentOutput(vec4f(1.0, 1.0, 1.0, 1.0), vec4f(0.0, 0.0, 0.0, 1.0));
+            return SURFACE_RETURN;
         }
 
         let dist_to_accretion_disks = sdf_accretion_disks(photon.ro);
         if dist_to_accretion_disks < uniforms.min_dist {
-            return FragmentOutput(vec4f(1.0, 1.0, 1.0, 1.0), vec4f(1.0, 1.0, 1.0, 1.0));
+            return ACCRETIONDISK_RETURN;
         }
 
         // photon is a small sphere at the back of the black hole
@@ -243,7 +248,7 @@ fn get_col(initial_photon: Photon) -> FragmentOutput {
                 );
             }
             if photon_sphere_dist < uniforms.min_dist {
-                return FragmentOutput(vec4<f32>(1.0, 1.0, 0.0, 1.0), vec4f(1.0, 1.0, 0.0, 1.0));
+                return PHOTON_SPHERE_RETURN;
             }
         }
 
@@ -293,14 +298,14 @@ fn get_col(initial_photon: Photon) -> FragmentOutput {
             if u32_to_bool(uniforms.blackout_requires_ray_towards_black_hole) {
                 for (var i = 0u; i < black_holes_uniform.count; i++) {
                     if (dists_to_singularities[i] < black_holes_uniform.black_holes[i].rs * (1.0 + uniforms.fast_mode * 0.5) && dot(photon.ro, photon.rd) < 0.0) {
-                        return FragmentOutput(vec4f(0.0, 0.0, 0.0, 1.0), vec4f(0.0, 0.0, 0.0, 1.0));
+                        return BLACKOUT_RETURN;
                     }
                 }
             } else {
                 for (var i = 0u; i < black_holes_uniform.count; i++) {
                     if (dists_to_singularities[i] < black_holes_uniform.black_holes[i].rs * (1.0 + uniforms.fast_mode * 0.5) && dot(photon.ro, photon.rd) < 0.0) ||
                         dists_to_singularities[i] < black_holes_uniform.black_holes[i].rs {
-                        return FragmentOutput(vec4f(0.0, 0.0, 0.0, 1.0), vec4f(0.0, 0.0, 0.0, 1.0));
+                        return BLACKOUT_RETURN;
                     }
                 }
             }
@@ -309,13 +314,13 @@ fn get_col(initial_photon: Photon) -> FragmentOutput {
         distance_travelled += delta_time;
         if distance_travelled > uniforms.max_dist {
             if u32_to_bool(uniforms.debug_colours) {
-                return FragmentOutput(vec4f(1.0, 0.0, 0.0, 1.0), vec4f(0.0, 0.0, 0.0, 1.0));
+                return vec3f(1.0, 0.0, 0.0);
             }
             break;
         }
     }
     if u32_to_bool(uniforms.debug_colours) {
-        return FragmentOutput(vec4f(0.0, 1.0, 0.0, 1.0), vec4f(0.0, 0.0, 0.0, 1.0));
+        return vec3f(0.0, 1.0, 0.0);
     }
     // any unit vector
     let normalized_final_rd = normalize(photon.rd);
@@ -329,18 +334,19 @@ fn get_col(initial_photon: Photon) -> FragmentOutput {
     // 1 - y because in texture coords, +y is down
     let bg_col = textureSampleLevel(t_diffuse, s_diffuse, vec2<f32>(x, 1.0 - y), 0.0).xyz;
     let mapped_bg_col = map_bg_col(bg_col);
-    return FragmentOutput(vec4f(mapped_bg_col, 1.0), vec4f(0.0, 0.0, 0.0, 1.0));;
+    return mapped_bg_col;
+    // return FragmentOutput(vec4f(mapped_bg_col, 1.0), vec4f(0.0, 0.0, 0.0, 1.0));;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput {
     let ray_dir = normalize(in.camera_to_vertex);
     let photon = Photon(camera.pos.xyz, ray_dir);
-    return get_col(photon);
-    // let col = get_col(photon);
-    // var blackout_col = col;
-    // if dot(col, col) < 1.0 {
-    //     blackout_col = vec3f(0.0);
-    // }
-    // return FragmentOutput(vec4<f32>(col, 1.0), vec4<f32>(blackout_col, 1.0));
+    // return get_col(photon);
+    let col = get_col(photon);
+    var blackout_col = col;
+    if dot(col, col) < 1.0 {
+        blackout_col = vec3f(0.0);
+    }
+    return FragmentOutput(vec4<f32>(col, 1.0), vec4<f32>(blackout_col, 1.0));
 }
