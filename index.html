@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Learn WGPU</title>
+    <title>Black Hole Ray Marching</title>
     <style>
         body {
             background-color: darkslateblue;
@@ -38,15 +38,15 @@
             initWebgpu().then(() => { console.log('WASM WebGPU Loaded'); });
             // }, 2000);
         }
-        document.getElementById("webgl-button").onclick = () => {
-            document.getElementById("wasm-target").innerHTML = "";
-            // setTimeout(() => {
-            initWebgl().then(() => { console.log('WASM WebGL Loaded'); });
-            // }, 2000);
-        }
+        // document.getElementById("webgl-button").onclick = () => {
+        //     document.getElementById("wasm-target").innerHTML = "";
+        //     // setTimeout(() => {
+        //     initWebgl().then(() => { console.log('WASM WebGL Loaded'); });
+        //     // }, 2000);
+        // }
     </script>
-    <button id="webgpu-button">webgpu</button>
-    <button id="webgl-button">webgl</button>
+    <button id="webgpu-button">start webgpu</button>
+    <!-- <button id="webgl-button">webgl</button> -->
     <div id="wasm-target"></div>
 </body>
 
