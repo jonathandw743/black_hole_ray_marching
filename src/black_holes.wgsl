@@ -152,7 +152,10 @@ fn rd_derivative(ro: vec3<f32>, h2s: array<f32, MAX_BLACK_HOLE_COUNT>) -> vec3<f
     var varh2s = h2s;
     for (var i = 0u; i < black_holes_uniform.count; i++) {
         let relative_pos = ro - black_holes_uniform.black_holes[i].pos;
-        res += uniforms.distortion_power * black_holes_uniform.black_holes[i].rs * -1.5 * varh2s[i] * relative_pos / pow(dot(relative_pos, relative_pos), 2.5);
+        let r2 = dot(relative_pos, relative_pos);
+        let r_hat_over_r5 = relative_pos / (r2 * r2 * r2);
+        // res += uniforms.distortion_power * black_holes_uniform.black_holes[i].rs * -1.5 * varh2s[i] * relative_pos / pow(dot(relative_pos, relative_pos), 2.0);
+        res += uniforms.distortion_power * black_holes_uniform.black_holes[i].rs * -1.5 * varh2s[i] * r_hat_over_r5;
     }
     return res;
 }
@@ -270,6 +273,7 @@ fn get_col(initial_photon: Photon) -> FragmentOutput {
         var modified_dist_to_singularities = uniforms.max_dist;
         for (var i = 0u; i < black_holes_uniform.count; i++) {
             modified_dist_to_singularities = min(modified_dist_to_singularities, uniforms.dist_to_singularity_mult * pow(dists_to_singularities[i], uniforms.dist_to_singularity_power));
+            modified_dist_to_singularities = min(modified_dist_to_singularities, uniforms.dist_to_surfaces_mult * dists_to_singularities[i]);
         }
 
         let delta_time = min(modified_dist_to_singularities, uniforms.dist_to_surfaces_mult * min(min(dist_to_surfaces, dist_to_accretion_disks), photon_sphere_dist));

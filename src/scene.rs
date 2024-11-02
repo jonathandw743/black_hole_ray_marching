@@ -94,9 +94,9 @@ impl Scene {
         #[cfg(not(feature = "keyboard_controls"))]
         #[rustfmt::skip]
         let other_uniforms = GuiOtherUniforms::new([
-            Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "dist_to_surfaces_mult".into(), value: 0.6 }, 0.0, 1.0)),
+            Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "dist_to_surfaces_mult".into(), value: 0.95 }, 0.0, 1.0)),
             Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "dist_to_singularity_power".into(), value: 2.0 }, 1.0, 10.0)),
-            Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "dist_to_singularity_mult".into(), value: 0.04 }, 0.0, 0.5)),
+            Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "dist_to_singularity_mult".into(), value: 0.05 }, 0.0, 0.5)),
             Box::new(GuiOtherUniform::<PodBool>::new(OtherUniform { label: "blackout_event_horizon".into(), value: PodBool::r#true() })),
             Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "min_dist".into(), value: 0.001 }, 0.0001, 0.01)),
             Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "max_dist".into(), value: 250.0 }, 5.0, 500.0)),
@@ -119,7 +119,7 @@ impl Scene {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
         
-        let black_holes_profile = BlackHolesProfile::Orbiting;
+        let black_holes_profile = BlackHolesProfile::Single;
 
         let black_holes_uniform = black_holes_profile.create_black_holes_uniform();
 
