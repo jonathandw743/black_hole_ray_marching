@@ -131,8 +131,7 @@ impl ApplicationHandler<UserEvent> for ApplicationWindow {
 
     fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: UserEvent) {
         match event {
-            UserEvent::ApplicationCreated(mut application) => {
-                application.resize(PhysicalSize { width: application.config.width, height: application.config.height });
+            UserEvent::ApplicationCreated(application) => {
                 self.app = Some(application);
             }
         }
