@@ -403,11 +403,11 @@ function __wbg_get_imports() {
         const ret = false;
         return ret;
     };
+    imports.wbg.__wbg_now_2353d97c748b7a64 = typeof Date.now == 'function' ? Date.now : notDefined('Date.now');
     imports.wbg.__wbindgen_string_new = function(arg0, arg1) {
         const ret = getStringFromWasm0(arg0, arg1);
         return addHeapObject(ret);
     };
-    imports.wbg.__wbg_now_2353d97c748b7a64 = typeof Date.now == 'function' ? Date.now : notDefined('Date.now');
     imports.wbg.__wbg_new_abda76e883ba8a5f = function() {
         const ret = new Error();
         return addHeapObject(ret);
