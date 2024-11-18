@@ -100,12 +100,12 @@ impl Scene {
             Box::new(GuiOtherUniform::<PodBool>::new(OtherUniform { label: "blackout_event_horizon".into(), value: PodBool::r#true() })),
             Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "min_dist".into(), value: 0.001 }, 0.0001, 0.01)),
             Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "max_dist".into(), value: 250.0 }, 5.0, 500.0)),
-            Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "distortion_power".into(), value: 1.0 }, 0.0, 1.0)),
+            Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "distortion_power".into(), value: 0.0 }, 0.0, 1.0)),
             Box::new(GuiOtherUniform::<PodBool>::new(OtherUniform { label: "debug_colours".into(), value: PodBool::r#false() })),
             Box::new(GuiOtherUniform::<PodBool>::new(OtherUniform { label: "blackout_requires_ray_towards_black_hole".into(), value: PodBool::r#false() })),
             Box::new(GuiOtherUniform::<PodBool>::new(OtherUniform { label: "photon_sphere".into(), value: PodBool::r#false() })),
             Box::new(GuiOtherUniform::<f32>::new(OtherUniform { label: "fast_mode".into(), value: 0.0 }, 0.0, 1.0)),
-            Box::new(GuiOtherUniform::<PodBool>::new(OtherUniform { label: "render_accretion_disks".into(), value: PodBool::r#true() })),
+            Box::new(GuiOtherUniform::<PodBool>::new(OtherUniform { label: "render_accretion_disks".into(), value: PodBool::r#false() })),
             Box::new(GuiOtherUniform::<PodBool>::new(OtherUniform { label: "render_markers".into(), value: PodBool::r#false() })),
         ]);
 
@@ -119,7 +119,7 @@ impl Scene {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
         
-        let black_holes_profile = BlackHolesProfile::Single;
+        let black_holes_profile = BlackHolesProfile::None;
 
         let black_holes_uniform = black_holes_profile.create_black_holes_uniform();
 

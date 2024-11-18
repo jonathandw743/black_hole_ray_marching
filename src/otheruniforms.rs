@@ -170,7 +170,7 @@ impl<const N: usize> GuiOtherUniforms<N> {
     pub fn ui(&mut self, ui: &mut Ui) {
         for other_uniform in &mut self.other_uniforms {
             other_uniform.ui(ui);
-        }       
+        }
     }
 }
 

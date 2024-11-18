@@ -209,7 +209,7 @@ impl State<'_> {
             // copy,
 
             // blur,
-            render_bloom: true,
+            render_bloom: false,
             // bloom,
             // downsampling,
             // upsampling,
@@ -227,7 +227,7 @@ impl State<'_> {
 
             frame_number: 0,
 
-            gui_enabled: true,
+            gui_enabled: false,
             gui,
 
             t0: Instant::now(),

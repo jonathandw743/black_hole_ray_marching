@@ -6,6 +6,7 @@ use crate::uniforms::{BlackHole, BlackHolesUniform};
 
 #[derive(PartialEq)]
 pub enum BlackHolesProfile {
+    None,
     Single,
     Dual,
     Orbiting,
@@ -16,6 +17,7 @@ pub enum BlackHolesProfile {
 impl BlackHolesProfile {
     pub fn create_black_holes_uniform<const N: usize>(&self) -> BlackHolesUniform<N> {
         match self {
+            Self::None => BlackHolesUniform::new([]),
             Self::Single => BlackHolesUniform::new([BlackHole {
                 pos: vec3(0.0, 0.0, 0.0),
                 rs: 1.0,
@@ -78,6 +80,7 @@ impl BlackHolesProfile {
         t: Duration,
     ) {
         match self {
+            Self::None => {},
             Self::Single => {
                 let _ = black_holes_uniform
                     .black_holes
